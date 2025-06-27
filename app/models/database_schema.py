@@ -8,7 +8,7 @@ class DatabaseSchema(Base):
     
     schema_id = Column(Integer, primary_key=True, autoincrement=True)
     schema_discription = Column(Text, nullable=True)  # 保持原SQL中的拼写
-    
+    schema_name = Column(Text, nullable=True)
     # 关系
     problems = relationship("Problem", back_populates="schema")
     

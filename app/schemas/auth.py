@@ -10,8 +10,8 @@ class LoginRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "account": "20230001",
-                "password": "password123",
+                "account": "20232251177",
+                "password": "*x3+K5Uu",
                 "role": "student"
             }
         }
@@ -34,4 +34,12 @@ class LoginResponse(BaseModel):
     """登录响应模式"""
     code: int = 200
     message: str = "登录成功"
-    data: LoginData 
+    data: LoginData
+
+class UpdatePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+
+
+

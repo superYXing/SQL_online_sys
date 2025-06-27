@@ -35,6 +35,44 @@ class AuthService:
         
         return user_info, access_token
     
+    def update_password(self, user_id: str, role: str, old_password: str, new_password: str, db: Session) -> bool:
+        """修改用户密码"""
+        # 根据角色获取用户
+        user = self._get_user_by_role_and_id(role, user_id, db)
+        
+        if not user:
+            return False
+        
+        # 验证旧密码
+        if not self._verify_password(user, old_password):
+            return False
+        
+        # 更新密码
+        return self._update_user_password(user, role, new_password, db)
+    
+    def _update_user_password(self, user, role: str, new_password: str, db: Session) -> bool:
+        """更新用户密码"""
+        try:
+            if role == "admin":
+                # 管理员密码更新（实际应用中应该存储到数据库）
+                # 这里只是示例，实际应该有专门的管理员表
+                return True  # 暂时返回True，实际需要更新数据库
+            elif role == "teacher":
+                # 更新教师密码
+                user.teacher_password = new_password  # 实际应用中应该加密
+                db.commit()
+                return True
+            elif role == "student":
+                # 更新学生密码
+                user.student_password = new_password  # 实际应用中应该加密
+                db.commit()
+                return True
+            
+            return False
+        except Exception:
+            db.rollback()
+            return False
+    
     def _get_user_by_role_and_id(self, role: str, account: str, db: Session):
         """根据角色和用户名获取用户"""
         if role == "admin":
@@ -62,7 +100,7 @@ class AuthService:
     def _verify_password(self, user, password: str) -> bool:
         """验证密码"""
         if isinstance(user, dict):  # 管理员
-            return user.get("admin_password") == password  # 实际应用中应该使用加密验证
+            return user.get("password") == password  # 实际应用中应该使用加密验证
         elif hasattr(user, 'teacher_password'):  # 教师
             return user.teacher_password == password  # 实际应用中应该使用加密验证
         elif hasattr(user, 'student_password'):  # 学生
@@ -74,23 +112,20 @@ class AuthService:
         """创建用户信息"""
         if isinstance(user, dict):  # 管理员
             return UserInfo(
-                id=str(user.admin_id),
-                username=user["account"],
-            
+                id=str(user["admin_id"]),
+                username="admin",
                 role=role
             )
         elif hasattr(user, 'teacher_id'):  # 教师
             return UserInfo(
                 id=str(user.teacher_id),
                 username=str(user.teacher_name),
-               
                 role=role
             )
         elif hasattr(user, 'student_id'):  # 学生
             return UserInfo(
                 id=str(user.student_id),
                 username=str(user.student_name),
-               
                 role=role
             )
         

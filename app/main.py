@@ -1,6 +1,9 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import RedirectResponse
+
 from controllers.auth_controller import auth_router
+from controllers.student_controller import student_router
 from services.auth_dependency import get_current_user
 
 # 创建FastAPI应用实例
@@ -23,14 +26,15 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(auth_router)
+app.include_router(student_router)
 
-@app.get("/", summary="根路径")
-async def root():
-    """根路径接口"""
-    return {"message": "欢迎使用SQL在线平台API", "version": "1.0.0"}
+@app.get("/", include_in_schema=False)  # 设置include_in_schema=False，使此路由不在文档中显示
+async def redirect_to_docs():
+    """根路径重定向到API文档"""
+    return RedirectResponse(url="/docs")
 
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="localhost", port=8000)

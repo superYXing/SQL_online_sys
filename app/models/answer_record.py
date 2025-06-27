@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint, String
 from sqlalchemy.orm import relationship
 from models.base import Base
 
@@ -7,13 +7,11 @@ class AnswerRecord(Base):
     __tablename__ = "answer_record"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    student_id = Column(Integer, ForeignKey("student.student_id"), nullable=False)
+    student_id = Column(Integer, ForeignKey("student.id"), nullable=False)
     problem_id = Column(Integer, ForeignKey("problem.problem_id"), nullable=False)
-    
-    # 唯一约束
-    __table_args__ = (
-        UniqueConstraint('student_id', 'problem_id', name='student_id'),
-    )
+    is_correct = Column(Integer, nullable=False)
+    answer_content = Column(String(255), nullable=False)
+
     
     # 关系
     student = relationship("Student", back_populates="answer_records")

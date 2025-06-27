@@ -43,6 +43,7 @@ async def get_current_teacher(current_user: dict = Depends(get_current_user)) ->
 
 async def get_current_student(current_user: dict = Depends(get_current_user)) -> dict:
     """获取当前学生用户"""
+    # 拿到的是学号，教职工号，而不是id
     if current_user.get("role") != "student":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
