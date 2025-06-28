@@ -143,7 +143,16 @@ class StudentService:
             if not problem:
                 return False, "题目不存在", None
 
-            #todo 这里应该有SQL执行和结果验证的逻辑
+            # TODO: 实现SQL语句正确性判断逻辑
+            # 根据接口文档要求，需要实现以下功能：
+            # 1. 执行学生提交的SQL语句
+            # 2. 与题目的标准答案或预期结果进行对比
+            # 3. 判断答案是否正确
+            # 4. 可能的实现方式：
+            #    - 执行SQL并对比查询结果
+            #    - 使用SQL解析器分析语法和语义
+            #    - 与标准答案进行模式匹配
+
             # 目前先简单模拟：如果SQL包含SELECT关键字就认为是正确的
             is_correct = 1 if "SELECT" in answer_content.upper() else 0
 

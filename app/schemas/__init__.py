@@ -13,6 +13,16 @@ from .admin import (
     StudentListResponse, OperationResponse, DatabaseSchemaCreateRequest,
     DatabaseSchemaUpdateRequest, DatabaseSchemaInfo, DatabaseSchemaListResponse
 )
+from .teacher import (
+    TeacherProfileResponse, CourseInfo, TeacherCourseListResponse,
+    StudentGradeInfo, CourseGradeResponse, StudentCreateRequest,
+    StudentCreateResponse, ImportFailDetail, StudentImportResponse,
+    ScoreCalculateRequest, StudentScoreInfo, ScoreUpdateResponse, ScoreListResponse
+)
+from .public import (
+    CurrentSemesterResponse, SemesterInfo, SemesterListResponse,
+    SystemInfoResponse, DatabaseSchemaPublicInfo, DatabaseSchemaPublicListResponse
+)
 
 __all__ = [
     "LoginRequest",
@@ -51,5 +61,24 @@ __all__ = [
     "DatabaseSchemaCreateRequest",
     "DatabaseSchemaUpdateRequest",
     "DatabaseSchemaInfo",
-    "DatabaseSchemaListResponse"
+    "DatabaseSchemaListResponse",
+    "TeacherProfileResponse",
+    "CourseInfo",
+    "TeacherCourseListResponse",
+    "StudentGradeInfo",
+    "CourseGradeResponse",
+    "StudentCreateRequest",
+    "StudentCreateResponse",
+    "ImportFailDetail",
+    "StudentImportResponse",
+    "ScoreCalculateRequest",
+    "StudentScoreInfo",
+    "ScoreUpdateResponse",
+    "ScoreListResponse",
+    "CurrentSemesterResponse",
+    "SemesterInfo",
+    "SemesterListResponse",
+    "SystemInfoResponse",
+    "DatabaseSchemaPublicInfo",
+    "DatabaseSchemaPublicListResponse"
 ]
