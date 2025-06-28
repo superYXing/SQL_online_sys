@@ -1,6 +1,7 @@
 from typing import Optional, Tuple, List
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from fastapi import HTTPException, status
 from models import Student, Teacher
 from schemas.admin import (
     StudentInfo, StudentListResponse, TeacherInfo, TeacherListResponse
@@ -8,11 +9,22 @@ from schemas.admin import (
 
 class UserManagementService:
     """用户管理服务类"""
+
+    def _verify_admin_role(self, current_user: dict) -> None:
+        """验证管理员角色"""
+        if not current_user or current_user.get("role") != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="需要管理员权限才能执行此操作"
+            )
     
     # 学生管理方法
-    def create_student(self, student_id: str, student_name: str, class_: str, 
-                      student_password: str, db: Session) -> Tuple[bool, str, Optional[StudentInfo]]:
+    def create_student(self, student_id: str, student_name: str, class_: str,
+                      student_password: str, current_user: dict, db: Session) -> Tuple[bool, str, Optional[StudentInfo]]:
         """创建学生"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             # 检查学生ID是否已存在
             existing_student = db.query(Student).filter(Student.student_id == student_id).first()
@@ -45,9 +57,12 @@ class UserManagementService:
             print(f"创建学生失败: {e}")
             return False, f"创建失败: {str(e)}", None
 
-    def get_students(self, page: int = 1, limit: int = 20, search: Optional[str] = None, 
-                    class_filter: Optional[str] = None, db: Session = None) -> StudentListResponse:
+    def get_students(self, page: int = 1, limit: int = 20, search: Optional[str] = None,
+                    class_filter: Optional[str] = None, current_user: dict = None, db: Session = None) -> StudentListResponse:
         """获取学生列表"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             query = db.query(Student)
             
@@ -92,8 +107,11 @@ class UserManagementService:
             print(f"获取学生列表失败: {e}")
             return StudentListResponse(students=[], total=0, page=page, limit=limit)
 
-    def get_student_by_id(self, student_id: str, db: Session) -> Optional[StudentInfo]:
+    def get_student_by_id(self, student_id: str, current_user: dict, db: Session) -> Optional[StudentInfo]:
         """根据ID获取学生信息"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             student = db.query(Student).filter(Student.student_id == student_id).first()
             if not student:
@@ -110,10 +128,13 @@ class UserManagementService:
             print(f"获取学生信息失败: {e}")
             return None
 
-    def update_student(self, student_id: str, student_name: Optional[str] = None, 
-                      class_: Optional[str] = None, student_password: Optional[str] = None, 
-                      db: Session = None) -> Tuple[bool, str, Optional[StudentInfo]]:
+    def update_student(self, student_id: str, student_name: Optional[str] = None,
+                      class_: Optional[str] = None, student_password: Optional[str] = None,
+                      current_user: dict = None, db: Session = None) -> Tuple[bool, str, Optional[StudentInfo]]:
         """更新学生信息"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             student = db.query(Student).filter(Student.student_id == student_id).first()
             if not student:
@@ -144,8 +165,11 @@ class UserManagementService:
             print(f"更新学生信息失败: {e}")
             return False, f"更新失败: {str(e)}", None
 
-    def delete_student(self, student_id: str, db: Session) -> Tuple[bool, str]:
+    def delete_student(self, student_id: str, current_user: dict, db: Session) -> Tuple[bool, str]:
         """删除学生"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             student = db.query(Student).filter(Student.student_id == student_id).first()
             if not student:
@@ -169,8 +193,12 @@ class UserManagementService:
             return False, f"删除失败: {str(e)}"
 
     # 教师管理方法
-    def create_teacher(self, teacher_id: str, teacher_name: str, teacher_password: str, db: Session) -> Tuple[bool, str, Optional[TeacherInfo]]:
+    def create_teacher(self, teacher_id: str, teacher_name: str, teacher_password: str,
+                      current_user: dict, db: Session) -> Tuple[bool, str, Optional[TeacherInfo]]:
         """创建教师"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
 
             # 检查教师ID是否已存在
@@ -202,8 +230,12 @@ class UserManagementService:
             print(f"创建教师失败: {e}")
             return False, f"创建失败: {str(e)}", None
 
-    def get_teachers(self, page: int = 1, limit: int = 20, search: Optional[str] = None, db: Session = None) -> TeacherListResponse:
+    def get_teachers(self, page: int = 1, limit: int = 20, search: Optional[str] = None,
+                    current_user: dict = None, db: Session = None) -> TeacherListResponse:
         """获取教师列表"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             query = db.query(Teacher)
             
@@ -243,8 +275,11 @@ class UserManagementService:
             print(f"获取教师列表失败: {e}")
             return TeacherListResponse(teachers=[], total=0, page=page, limit=limit)
 
-    def get_teacher_by_id(self, teacher_id: str, db: Session) -> Optional[TeacherInfo]:
+    def get_teacher_by_id(self, teacher_id: str, current_user: dict, db: Session) -> Optional[TeacherInfo]:
         """根据ID获取教师信息"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
             if not teacher:
@@ -260,9 +295,13 @@ class UserManagementService:
             print(f"获取教师信息失败: {e}")
             return None
 
-    def update_teacher(self, teacher_id: str, teacher_name: Optional[str] = None, 
-                      teacher_password: Optional[str] = None, db: Session = None) -> Tuple[bool, str, Optional[TeacherInfo]]:
+    def update_teacher(self, teacher_id: str, teacher_name: Optional[str] = None,
+                      teacher_password: Optional[str] = None, current_user: dict = None,
+                      db: Session = None) -> Tuple[bool, str, Optional[TeacherInfo]]:
         """更新教师信息"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
             if not teacher:
@@ -290,8 +329,11 @@ class UserManagementService:
             print(f"更新教师信息失败: {e}")
             return False, f"更新失败: {str(e)}", None
 
-    def delete_teacher(self, teacher_id: str, db: Session) -> Tuple[bool, str]:
+    def delete_teacher(self, teacher_id: str, current_user: dict, db: Session) -> Tuple[bool, str]:
         """删除教师"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
             if not teacher:

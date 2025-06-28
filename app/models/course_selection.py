@@ -10,11 +10,8 @@ class CourseSelection(Base):
     student_id = Column(Integer, ForeignKey("student.id"), nullable=False)
     date_id = Column(String(10), nullable=False)
     course_id = Column(Integer, ForeignKey("course.course_id"), nullable=False)
-    
-    # 唯一约束
-    __table_args__ = (
-        UniqueConstraint('student_id', 'date_id', 'course_id', name='student_id'),
-    )
+    score = Column(Integer, nullable=False)
+
     
     # 关系
     student = relationship("Student", back_populates="course_selections")

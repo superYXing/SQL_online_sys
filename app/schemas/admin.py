@@ -162,6 +162,52 @@ class SemesterListResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# 数据库模式管理相关模型
+class DatabaseSchemaCreateRequest(BaseModel):
+    """创建数据库模式请求模型"""
+    schema_name: str
+    schema_description: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "schema_name": "员工管理系统",
+                "schema_description": "包含员工、部门、薪资等表的数据库模式"
+            }
+        }
+
+class DatabaseSchemaUpdateRequest(BaseModel):
+    """更新数据库模式请求模型"""
+    schema_name: Optional[str] = None
+    schema_description: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "schema_name": "员工管理系统（更新）",
+                "schema_description": "更新后的数据库模式描述"
+            }
+        }
+
+class DatabaseSchemaInfo(BaseModel):
+    """数据库模式信息模型"""
+    schema_id: int
+    schema_name: Optional[str]
+    schema_description: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+class DatabaseSchemaListResponse(BaseModel):
+    """数据库模式列表响应模型"""
+    schemas: List[DatabaseSchemaInfo]
+    total: int
+    page: int
+    limit: int
+
+    class Config:
+        from_attributes = True
+
 # 通用响应模型
 class OperationResponse(BaseModel):
     """通用操作响应模型"""

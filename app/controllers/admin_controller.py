@@ -6,7 +6,8 @@ from schemas.admin import (
     SemesterUpdateRequest, SemesterUpdateResponse, SemesterInfo, SemesterCreateRequest,
     SemesterListResponse, TeacherCreateRequest, TeacherInfo, TeacherUpdateRequest,
     TeacherListResponse, StudentCreateRequest, StudentInfo, StudentUpdateRequest,
-    StudentListResponse, OperationResponse
+    StudentListResponse, OperationResponse, DatabaseSchemaCreateRequest,
+    DatabaseSchemaUpdateRequest, DatabaseSchemaInfo, DatabaseSchemaListResponse
 )
 from schemas.response import BaseResponse
 from services.admin_service import admin_service
@@ -47,6 +48,7 @@ async def update_semester_time(
             semester_id=request_data.semester_id,
             begin_date=request_data.begin_date,
             end_date=request_data.end_date,
+            current_user=current_user,
             db=db
         )
         
@@ -138,6 +140,7 @@ async def create_teacher(
             teacher_id=teacher_data.teacher_id,
             teacher_name=teacher_data.teacher_name,
             teacher_password=teacher_data.teacher_password,
+            current_user=current_user,
             db=db
         )
 
@@ -182,6 +185,7 @@ async def get_teachers(
             page=page,
             limit=limit,
             search=search,
+            current_user=current_user,
             db=db
         )
 
@@ -212,6 +216,7 @@ async def get_teacher(
     try:
         teacher_info = user_management_service.get_teacher_by_id(
             teacher_id=teacher_id,
+            current_user=current_user,
             db=db
         )
 
@@ -257,6 +262,7 @@ async def update_teacher(
             teacher_id=teacher_id,
             teacher_name=teacher_data.teacher_name,
             teacher_password=teacher_data.teacher_password,
+            current_user=current_user,
             db=db
         )
 
@@ -295,6 +301,7 @@ async def delete_teacher(
     try:
         success, message = user_management_service.delete_teacher(
             teacher_id=teacher_id,
+            current_user=current_user,
             db=db
         )
 
@@ -340,6 +347,7 @@ async def create_student(
             student_name=student_data.student_name,
             class_=student_data.class_,
             student_password=student_data.student_password,
+            current_user=current_user,
             db=db
         )
 
@@ -387,6 +395,7 @@ async def get_students(
             limit=limit,
             search=search,
             class_filter=class_filter,
+            current_user=current_user,
             db=db
         )
 
@@ -417,6 +426,7 @@ async def get_student(
     try:
         student_info = user_management_service.get_student_by_id(
             student_id=student_id,
+            current_user=current_user,
             db=db
         )
 
@@ -464,6 +474,7 @@ async def update_student(
             student_name=student_data.student_name,
             class_=student_data.class_,
             student_password=student_data.student_password,
+            current_user=current_user,
             db=db
         )
 
@@ -502,6 +513,7 @@ async def delete_student(
     try:
         success, message = user_management_service.delete_student(
             student_id=student_id,
+            current_user=current_user,
             db=db
         )
 
@@ -549,6 +561,7 @@ async def create_semester(
             semester_name=semester_data.semester_name,
             begin_date=semester_data.begin_date,
             end_date=semester_data.end_date,
+            current_user=current_user,
             db=db
         )
 
@@ -581,7 +594,7 @@ async def get_semesters(
     返回所有学期的列表，包括学期信息和时间范围
     """
     try:
-        semesters = admin_service.get_semesters(db=db)
+        semesters = admin_service.get_semesters(current_user=current_user, db=db)
         return semesters
 
     except Exception as e:
@@ -609,6 +622,7 @@ async def delete_semester(
     try:
         success, message = admin_service.delete_semester(
             semester_id=semester_id,
+            current_user=current_user,
             db=db
         )
 
@@ -626,4 +640,207 @@ async def delete_semester(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"删除学期失败: {str(e)}"
+        )
+
+# 数据库模式管理接口
+@admin_router.post("/schemas", response_model=DatabaseSchemaInfo, summary="创建数据库模式")
+async def create_database_schema(
+    schema_data: DatabaseSchemaCreateRequest,
+    current_user: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    创建数据库模式
+
+    需要管理员身份的JWT认证令牌
+
+    请求参数：
+    - schema_name: 数据库模式名称（唯一）
+    - schema_description: 数据库模式描述（可选）
+
+    返回创建的数据库模式信息
+    """
+    try:
+        success, message, schema_info = admin_service.create_database_schema(
+            schema_name=schema_data.schema_name,
+            schema_description=schema_data.schema_description,
+            current_user=current_user,
+            db=db
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=message
+            )
+
+        return schema_info
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"创建数据库模式失败: {str(e)}"
+        )
+
+@admin_router.get("/schemas", response_model=DatabaseSchemaListResponse, summary="获取数据库模式列表")
+async def get_database_schemas(
+    page: int = Query(1, ge=1, description="页码"),
+    limit: int = Query(20, ge=1, le=100, description="每页数量"),
+    search: Optional[str] = Query(None, description="搜索关键词（模式名称）"),
+    current_user: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    获取数据库模式列表
+
+    需要管理员身份的JWT认证令牌
+
+    查询参数：
+    - page: 页码（默认1）
+    - limit: 每页数量（默认20，最大100）
+    - search: 搜索关键词（可选）
+
+    返回数据库模式列表和分页信息
+    """
+    try:
+        schemas = admin_service.get_database_schemas(
+            page=page,
+            limit=limit,
+            search=search,
+            current_user=current_user,
+            db=db
+        )
+
+        return schemas
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取数据库模式列表失败: {str(e)}"
+        )
+
+@admin_router.get("/schemas/{schema_id}", response_model=DatabaseSchemaInfo, summary="获取数据库模式信息")
+async def get_database_schema(
+    schema_id: int,
+    current_user: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    获取指定数据库模式的详细信息
+
+    需要管理员身份的JWT认证令牌
+
+    路径参数：
+    - schema_id: 数据库模式ID
+
+    返回数据库模式的详细信息
+    """
+    try:
+        schema_info = admin_service.get_database_schema_by_id(
+            schema_id=schema_id,
+            current_user=current_user,
+            db=db
+        )
+
+        if not schema_info:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="数据库模式不存在"
+            )
+
+        return schema_info
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取数据库模式信息失败: {str(e)}"
+        )
+
+@admin_router.put("/schemas/{schema_id}", response_model=DatabaseSchemaInfo, summary="更新数据库模式信息")
+async def update_database_schema(
+    schema_id: int,
+    schema_data: DatabaseSchemaUpdateRequest,
+    current_user: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    更新数据库模式信息
+
+    需要管理员身份的JWT认证令牌
+
+    路径参数：
+    - schema_id: 数据库模式ID
+
+    请求参数：
+    - schema_name: 数据库模式名称（可选）
+    - schema_description: 数据库模式描述（可选）
+
+    返回更新后的数据库模式信息
+    """
+    try:
+        success, message, schema_info = admin_service.update_database_schema(
+            schema_id=schema_id,
+            schema_name=schema_data.schema_name,
+            schema_description=schema_data.schema_description,
+            current_user=current_user,
+            db=db
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=message
+            )
+
+        return schema_info
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"更新数据库模式失败: {str(e)}"
+        )
+
+@admin_router.delete("/schemas/{schema_id}", response_model=OperationResponse, summary="删除数据库模式")
+async def delete_database_schema(
+    schema_id: int,
+    current_user: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    删除数据库模式
+
+    需要管理员身份的JWT认证令牌
+
+    路径参数：
+    - schema_id: 数据库模式ID
+
+    注意：如果数据库模式有关联的题目，将无法删除
+    """
+    try:
+        success, message = admin_service.delete_database_schema(
+            schema_id=schema_id,
+            current_user=current_user,
+            db=db
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=message
+            )
+
+        return OperationResponse(success=success, message=message)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"删除数据库模式失败: {str(e)}"
         )

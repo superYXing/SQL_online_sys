@@ -90,3 +90,39 @@ class AnswerRecordsResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ProblemItem(BaseModel):
+    """题目项模型"""
+    problem_id: int
+    problem_content: str
+    is_required: int
+    schema_id: int
+
+    class Config:
+        from_attributes = True
+
+class ProblemListResponse(BaseModel):
+    """题目列表响应模型"""
+    problems: List[ProblemItem]
+    total: int
+    schema_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+class DatabaseSchemaItem(BaseModel):
+    """数据库模式项模型"""
+    schema_id: int
+    schema_name: Optional[str]
+    schema_description: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+class DatabaseSchemaListResponse(BaseModel):
+    """数据库模式列表响应模型"""
+    schemas: List[DatabaseSchemaItem]
+    total: int
+
+    class Config:
+        from_attributes = True

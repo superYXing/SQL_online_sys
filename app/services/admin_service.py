@@ -1,15 +1,31 @@
 from typing import Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from models import Semester, DateRange
-from schemas.admin import SemesterInfo, SemesterUpdateResponse, SemesterListResponse
+from fastapi import HTTPException, status
+from models import Semester, DateRange, DatabaseSchema
+from schemas.admin import (
+    SemesterInfo, SemesterUpdateResponse, SemesterListResponse,
+    DatabaseSchemaInfo, DatabaseSchemaListResponse
+)
 from datetime import date
 
 class AdminService:
     """管理员服务类"""
+
+    def _verify_admin_role(self, current_user: dict) -> None:
+        """验证管理员角色"""
+        if not current_user or current_user.get("role") != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="需要管理员权限才能执行此操作"
+            )
     
-    def update_semester_time(self, semester_id: int, begin_date: date, end_date: date, db: Session) -> Tuple[bool, str, Optional[SemesterInfo]]:
+    def update_semester_time(self, semester_id: int, begin_date: date, end_date: date,
+                           current_user: dict, db: Session) -> Tuple[bool, str, Optional[SemesterInfo]]:
         """修改学期时间"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             # 验证日期有效性
             if begin_date >= end_date:
@@ -90,8 +106,12 @@ class AdminService:
             return None
 
     # 学期管理方法
-    def create_semester(self, semester_name: str, begin_date: date, end_date: date, db: Session) -> Tuple[bool, str, Optional[SemesterInfo]]:
+    def create_semester(self, semester_name: str, begin_date: date, end_date: date,
+                       current_user: dict, db: Session) -> Tuple[bool, str, Optional[SemesterInfo]]:
         """创建学期"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             # 验证日期有效性
             if begin_date >= end_date:
@@ -141,8 +161,11 @@ class AdminService:
             print(f"创建学期失败: {e}")
             return False, f"创建失败: {str(e)}", None
 
-    def get_semesters(self, db: Session) -> SemesterListResponse:
+    def get_semesters(self, current_user: dict, db: Session) -> SemesterListResponse:
         """获取学期列表"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             # 查询所有学期及其日期范围信息
             results = db.query(Semester, DateRange).join(
@@ -168,8 +191,11 @@ class AdminService:
             print(f"获取学期列表失败: {e}")
             return SemesterListResponse(semesters=[], total=0)
 
-    def delete_semester(self, semester_id: int, db: Session) -> Tuple[bool, str]:
+    def delete_semester(self, semester_id: int, current_user: dict, db: Session) -> Tuple[bool, str]:
         """删除学期"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
         try:
             semester = db.query(Semester).filter(Semester.semester_id == semester_id).first()
             if not semester:
@@ -193,6 +219,175 @@ class AdminService:
         except Exception as e:
             db.rollback()
             print(f"删除学期失败: {e}")
+            return False, f"删除失败: {str(e)}"
+
+    # 数据库模式管理方法
+    def create_database_schema(self, schema_name: str, schema_description: Optional[str],
+                              current_user: dict, db: Session) -> Tuple[bool, str, Optional[DatabaseSchemaInfo]]:
+        """创建数据库模式"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
+        try:
+            # 检查模式名称是否已存在
+            existing_schema = db.query(DatabaseSchema).filter(
+                DatabaseSchema.schema_name == schema_name
+            ).first()
+            if existing_schema:
+                return False, "数据库模式名称已存在", None
+
+            # 创建新的数据库模式
+            new_schema = DatabaseSchema(
+                schema_name=schema_name,
+                schema_discription=schema_description  # 注意原字段名的拼写
+            )
+
+            db.add(new_schema)
+            db.commit()
+            db.refresh(new_schema)
+
+            schema_info = DatabaseSchemaInfo(
+                schema_id=new_schema.schema_id,
+                schema_name=new_schema.schema_name,
+                schema_description=new_schema.schema_discription
+            )
+
+            return True, "数据库模式创建成功", schema_info
+
+        except Exception as e:
+            db.rollback()
+            print(f"创建数据库模式失败: {e}")
+            return False, f"创建失败: {str(e)}", None
+
+    def get_database_schemas(self, page: int = 1, limit: int = 20, search: Optional[str] = None,
+                           current_user: dict = None, db: Session = None) -> DatabaseSchemaListResponse:
+        """获取数据库模式列表"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
+        try:
+            query = db.query(DatabaseSchema)
+
+            # 搜索功能
+            if search:
+                query = query.filter(
+                    DatabaseSchema.schema_name.contains(search)
+                )
+
+            # 获取总数
+            total = query.count()
+
+            # 分页查询
+            offset = (page - 1) * limit
+            schemas = query.offset(offset).limit(limit).all()
+
+            # 构建响应数据
+            schema_list = []
+            for schema in schemas:
+                schema_list.append(DatabaseSchemaInfo(
+                    schema_id=schema.schema_id,
+                    schema_name=schema.schema_name,
+                    schema_description=schema.schema_discription
+                ))
+
+            return DatabaseSchemaListResponse(
+                schemas=schema_list,
+                total=total,
+                page=page,
+                limit=limit
+            )
+
+        except Exception as e:
+            print(f"获取数据库模式列表失败: {e}")
+            return DatabaseSchemaListResponse(schemas=[], total=0, page=page, limit=limit)
+
+    def get_database_schema_by_id(self, schema_id: int, current_user: dict,
+                                 db: Session) -> Optional[DatabaseSchemaInfo]:
+        """根据ID获取数据库模式信息"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
+        try:
+            schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == schema_id).first()
+            if not schema:
+                return None
+
+            return DatabaseSchemaInfo(
+                schema_id=schema.schema_id,
+                schema_name=schema.schema_name,
+                schema_description=schema.schema_discription
+            )
+
+        except Exception as e:
+            print(f"获取数据库模式信息失败: {e}")
+            return None
+
+    def update_database_schema(self, schema_id: int, schema_name: Optional[str] = None,
+                              schema_description: Optional[str] = None, current_user: dict = None,
+                              db: Session = None) -> Tuple[bool, str, Optional[DatabaseSchemaInfo]]:
+        """更新数据库模式信息"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
+        try:
+            schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == schema_id).first()
+            if not schema:
+                return False, "数据库模式不存在", None
+
+            # 如果要更新名称，检查是否与其他模式重名
+            if schema_name and schema_name != schema.schema_name:
+                existing_schema = db.query(DatabaseSchema).filter(
+                    DatabaseSchema.schema_name == schema_name,
+                    DatabaseSchema.schema_id != schema_id
+                ).first()
+                if existing_schema:
+                    return False, "数据库模式名称已存在", None
+
+            # 更新字段
+            if schema_name is not None:
+                schema.schema_name = schema_name
+            if schema_description is not None:
+                schema.schema_discription = schema_description
+
+            db.commit()
+            db.refresh(schema)
+
+            schema_info = DatabaseSchemaInfo(
+                schema_id=schema.schema_id,
+                schema_name=schema.schema_name,
+                schema_description=schema.schema_discription
+            )
+
+            return True, "数据库模式更新成功", schema_info
+
+        except Exception as e:
+            db.rollback()
+            print(f"更新数据库模式失败: {e}")
+            return False, f"更新失败: {str(e)}", None
+
+    def delete_database_schema(self, schema_id: int, current_user: dict,
+                              db: Session) -> Tuple[bool, str]:
+        """删除数据库模式"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
+
+        try:
+            schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == schema_id).first()
+            if not schema:
+                return False, "数据库模式不存在"
+
+            # 检查是否有关联的题目
+            if hasattr(schema, 'problems') and schema.problems:
+                return False, "该数据库模式有关联的题目，无法删除"
+
+            db.delete(schema)
+            db.commit()
+
+            return True, "数据库模式删除成功"
+
+        except Exception as e:
+            db.rollback()
+            print(f"删除数据库模式失败: {e}")
             return False, f"删除失败: {str(e)}"
 
 # 全局管理员服务实例

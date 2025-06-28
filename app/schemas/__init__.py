@@ -2,13 +2,16 @@ from .auth import LoginRequest, UserInfo, LoginData, LoginResponse, UpdatePasswo
 from .response import BaseResponse
 from .student import (
     StudentProfileResponse, StudentRankItem, StudentRankResponse,
-    AnswerSubmitRequest, AnswerSubmitResponse, AnswerRecordItem, AnswerRecordsResponse
+    AnswerSubmitRequest, AnswerSubmitResponse, AnswerRecordItem, AnswerRecordsResponse,
+    ProblemItem, ProblemListResponse, DatabaseSchemaItem, DatabaseSchemaListResponse,
+    StudentDashboardItem, StudentDashboardResponse
 )
 from .admin import (
     SemesterUpdateRequest, SemesterUpdateResponse, SemesterInfo, SemesterCreateRequest,
     SemesterListResponse, TeacherCreateRequest, TeacherInfo, TeacherUpdateRequest,
     TeacherListResponse, StudentCreateRequest, StudentInfo, StudentUpdateRequest,
-    StudentListResponse, OperationResponse
+    StudentListResponse, OperationResponse, DatabaseSchemaCreateRequest,
+    DatabaseSchemaUpdateRequest, DatabaseSchemaInfo, DatabaseSchemaListResponse
 )
 
 __all__ = [
@@ -25,6 +28,12 @@ __all__ = [
     "AnswerSubmitResponse",
     "AnswerRecordItem",
     "AnswerRecordsResponse",
+    "ProblemItem",
+    "ProblemListResponse",
+    "DatabaseSchemaItem",
+    "DatabaseSchemaListResponse",
+    "StudentDashboardItem",
+    "StudentDashboardResponse",
     "SemesterUpdateRequest",
     "SemesterUpdateResponse",
     "SemesterInfo",
@@ -38,5 +47,9 @@ __all__ = [
     "StudentInfo",
     "StudentUpdateRequest",
     "StudentListResponse",
-    "OperationResponse"
+    "OperationResponse",
+    "DatabaseSchemaCreateRequest",
+    "DatabaseSchemaUpdateRequest",
+    "DatabaseSchemaInfo",
+    "DatabaseSchemaListResponse"
 ]
