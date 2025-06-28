@@ -4,7 +4,7 @@ from starlette.responses import RedirectResponse
 
 from controllers.auth_controller import auth_router
 from controllers.student_controller import student_router
-from services.auth_dependency import get_current_user
+from controllers.admin_controller import admin_router
 
 # 创建FastAPI应用实例
 app = FastAPI(
@@ -27,6 +27,7 @@ app.add_middleware(
 # 注册路由
 app.include_router(auth_router)
 app.include_router(student_router)
+app.include_router(admin_router)
 
 @app.get("/", include_in_schema=False)  # 设置include_in_schema=False，使此路由不在文档中显示
 async def redirect_to_docs():

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint, String
+from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint, String, DateTime
 from sqlalchemy.orm import relationship
 from models.base import Base
 
@@ -11,6 +11,7 @@ class AnswerRecord(Base):
     problem_id = Column(Integer, ForeignKey("problem.problem_id"), nullable=False)
     is_correct = Column(Integer, nullable=False)
     answer_content = Column(String(255), nullable=False)
+    timestep = Column(DateTime, nullable=False)
 
     
     # 关系

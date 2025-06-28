@@ -13,7 +13,6 @@ class Semester(Base):
     # 关系
     date_range = relationship("DateRange", back_populates="semesters")
     courses = relationship("Course", back_populates="semester")
-    course_selections = relationship("CourseSelection", back_populates="semester")
     
     def __repr__(self):
         return f"<Semester(id={self.semester_id}, name='{self.semester_name}')>" 
