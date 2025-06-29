@@ -445,6 +445,155 @@ class StudentProfileResponse(BaseModel):
             }
         }
 
+# 获取学生信息接口相关模型
+class StudentInfoResponse(BaseModel):
+    """获取学生信息响应模型"""
+    code: int = 200
+    msg: str = "查询成功"
+    data: Dict[str, Any]
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "code": 200,
+                "msg": "查询成功",
+                "data": {
+                    "student_id": "20232251177",
+                    "student_name": "张三",
+                    "class": "计算机科学与技术1班"
+                }
+            }
+        }
+
+# 学生答题概况接口相关模型
+class StudentProfileData(BaseModel):
+    """学生答题概况数据模型"""
+    student_id: str
+    student_name: str
+    class_: str = Field(..., alias="class")
+    total_problems: int
+    completed_problems: int
+    correct_problems: int
+    completion_rate: float
+    accuracy_rate: float
+    last_submission_time: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class StudentProfileNewResponse(BaseModel):
+    """学生答题概况新响应模型"""
+    code: int = 200
+    msg: str = "查询成功"
+    data: StudentProfileData
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "code": 200,
+                "msg": "查询成功",
+                "data": {
+                    "student_id": "20232251177",
+                    "student_name": "张三",
+                    "class": "计算机科学与技术1班",
+                    "total_problems": 10,
+                    "completed_problems": 8,
+                    "correct_problems": 6,
+                    "completion_rate": 80.0,
+                    "accuracy_rate": 75.0,
+                    "last_submission_time": "2024-03-15 14:30:00"
+                }
+            }
+        }
+
+# 学生答题概况接口（按文档要求）相关模型
+class StudentProfileDocResponse(BaseModel):
+    """学生答题概况响应模型（按文档要求）"""
+    student_id: str
+    student_name: str
+    class_name: str
+    course_id: int
+    correct_count: int
+    submit_count: int
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "student_id": "20252261107",
+                "student_name": "刘东",
+                "class_name": "2024级7班",
+                "course_id": 3,
+                "correct_count": 1,
+                "submit_count": 4
+            }
+        }
+
+# 获取学生详细信息接口相关模型
+class StudentDetailResponse(BaseModel):
+    """获取学生详细信息响应模型"""
+    id: int
+    student_id: str
+    student_name: Optional[str] = None
+    class_: Optional[str] = Field(None, alias="class")
+    course_id: int
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "student_id": "20232251177",
+                "student_name": "张三",
+                "class": "计算机科学与技术1班",
+                "course_id": 3
+            }
+        }
+
+# 导出指定学生成绩数据接口相关模型
+class StudentScoreExportItem(BaseModel):
+    """学生成绩导出项模型"""
+    student_id: str
+    student_name: str
+    class_: str = Field(..., alias="class")
+    course_id: int
+    score: int
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class StudentScoreExportRequest(BaseModel):
+    """学生成绩导出请求模型"""
+    students: List[StudentScoreExportItem]
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "students": [
+                    {
+                        "student_id": "20232241177",
+                        "student_name": "张三",
+                        "class": "软件2301",
+                        "course_id": 1,
+                        "score": 20
+                    },
+                    {
+                        "student_id": "20232241178",
+                        "student_name": "李四",
+                        "class": "软件2302",
+                        "course_id": 2,
+                        "score": 60
+                    }
+                ]
+            }
+        }
+
 # 题目统计相关模型
 class ProblemStatItem(BaseModel):
     """题目统计项模型"""
@@ -482,6 +631,50 @@ class ProblemStatisticsResponse(BaseModel):
                     }
                 ],
                 "total_problems": 1
+            }
+        }
+
+# 学生题目统计汇总相关模型
+class StudentProblemStatItem(BaseModel):
+    """学生题目统计项模型"""
+    student_name: str
+    class_: str = Field(..., alias="class")
+    problem_id: int
+    correct_count: int
+    submit_count: int
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class StudentProblemStatisticsResponse(BaseModel):
+    """学生题目统计汇总响应模型"""
+    code: int = 200
+    msg: str = "查询成功"
+    data: List[StudentProblemStatItem]
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "code": 200,
+                "msg": "查询成功",
+                "data": [
+                    {
+                        "student_name": "张三",
+                        "class": "软件2301",
+                        "problem_id": 5,
+                        "correct_count": 1,
+                        "submit_count": 2
+                    },
+                    {
+                        "student_name": "李四",
+                        "class": "软件2302",
+                        "problem_id": 5,
+                        "correct_count": 0,
+                        "submit_count": 3
+                    }
+                ]
             }
         }
 
@@ -543,34 +736,42 @@ class DatasetExportResponse(BaseModel):
         }
 
 # 题目详情和编辑相关模型
-class ProblemDetailResponse(BaseModel):
-    """题目详情响应模型"""
+class ProblemDetailData(BaseModel):
+    """题目详情数据模型"""
     problem_id: int
+    title: str
     problem_content: str
-    is_required: int
-    schema_id: int
-    schema_name: str
     example_sql: Optional[str] = None
-    created_time: Optional[str] = None
-    updated_time: Optional[str] = None
+    is_required: int
+
+    class Config:
+        from_attributes = True
+
+class ProblemDetailResponse(BaseModel):
+    """题目详情响应模型（按接口文档格式）"""
+    code: int
+    msg: str
+    data: ProblemDetailData
 
     class Config:
         from_attributes = True
         json_schema_extra = {
             "example": {
-                "problem_id": 5,
-                "problem_content": "查询所有员工信息",
-                "is_required": 1,
-                "schema_id": 1,
-                "schema_name": "ORACLE_HR",
-                "example_sql": "SELECT * FROM employees",
-                "created_time": "2024-01-01 00:00:00",
-                "updated_time": "2024-03-15 14:30:00"
+                "code": 200,
+                "msg": "查询成功",
+                "data": {
+                    "problem_id": 6,
+                    "title": "NO.6",
+                    "problem_content": "找到满足如下条件的员工：\n1. 具有超过4个直接下属并且工资高于7000的直接下属员工\n2. 员工的工资高于所在部门平均工资的1.3倍",
+                    "example_sql": "WITH a AS (\n  SELECT MANAGER_ID, count(*) cnt\n  FROM EMPLOYEES\n  WHERE SALARY >7000\n  GROUP BY MANAGER_ID\n)",
+                    "is_required": 1
+                }
             }
         }
 
 class ProblemEditRequest(BaseModel):
-    """题目编辑请求模型"""
+    """题目编辑请求模型（按接口文档要求）"""
+    problem_id: int
     problem_content: Optional[str] = None
     is_required: Optional[int] = None
     example_sql: Optional[str] = None
@@ -578,31 +779,38 @@ class ProblemEditRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "problem_content": "查询所有员工的姓名和部门信息",
-                "is_required": 1,
-                "example_sql": "SELECT name, department FROM employees"
+                "problem_id": 6,
+                "problem_content": "找到满足如下条件的员工：\n1. 具有超过4个直接下属且工资高于7000的直接下属员工\n2. 员工工资高于所在部门平均工资的1.3倍",
+                "example_sql": "WITH managers AS (\n  SELECT MANAGER_ID, COUNT(*) AS direct_reports\n  FROM EMPLOYEES\n  WHERE SALARY > 7000\n  GROUP BY MANAGER_ID\n)",
+                "is_required": 1
             }
         }
 
 class ProblemEditResponse(BaseModel):
-    """题目编辑响应模型"""
-    success: bool
-    message: str
-    problem: Optional[ProblemDetailResponse] = None
+    """题目编辑响应模型（按接口文档要求）"""
+    code: int
+    msg: str
 
     class Config:
         from_attributes = True
         json_schema_extra = {
             "example": {
-                "success": True,
-                "message": "题目更新成功",
-                "problem": {
-                    "problem_id": 5,
-                    "problem_content": "查询所有员工的姓名和部门信息",
-                    "is_required": 1,
-                    "schema_id": 1,
-                    "schema_name": "ORACLE_HR"
-                }
+                "code": 200,
+                "msg": "题目更新成功"
+            }
+        }
+
+class ProblemDeleteResponse(BaseModel):
+    """题目删除响应模型"""
+    code: int
+    msg: str
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "code": 200,
+                "msg": "题目删除成功"
             }
         }
 
@@ -658,7 +866,7 @@ class ExportStudentInfo(BaseModel):
 
     class Config:
         from_attributes = True
-        allow_population_by_field_name = True
+        populate_by_name = True
         json_schema_extra = {
             "example": {
                 "student_id": "20232241177",
