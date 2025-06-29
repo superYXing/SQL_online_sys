@@ -126,3 +126,32 @@ class DatabaseSchemaListResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class AIAnalyzeRequest(BaseModel):
+    """AI分析请求模型"""
+    problem_id: int
+    answer_content: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "problem_id": 5,
+                "answer_content": "SELECT * FROM employees;"
+            }
+        }
+
+class AIAnalyzeResponse(BaseModel):
+    """AI分析响应模型"""
+    code: int
+    message: str
+    ai_content: str
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "code": 200,
+                "message": "请求成功！",
+                "ai_content": "您的SQL语句语法正确，能够查询出所有员工的信息。建议可以尝试使用WHERE子句来筛选特定条件的员工，或者使用ORDER BY来排序结果。"
+            }
+        }

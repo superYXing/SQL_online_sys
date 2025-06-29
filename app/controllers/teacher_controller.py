@@ -1795,7 +1795,7 @@ async def edit_problem(
 @teacher_router.delete("/problem/delete", response_model=ProblemDeleteResponse, summary="删除题目")
 async def delete_problem(
     problem_id: int = Query(..., description="题目ID"),
-    current_user: dict = Depends(get_teacher_or_admin()),
+    current_user: dict = Depends(get_teacher_or_admin),
     db: Session = Depends(get_db)
 ):
     """

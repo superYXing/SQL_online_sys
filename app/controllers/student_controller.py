@@ -6,7 +6,7 @@ import schemas.student
 from schemas.student import (
     StudentProfileResponse, StudentRankItem, AnswerSubmitRequest,
     AnswerSubmitResponse, AnswerRecordsResponse, ProblemListResponse,
-    DatabaseSchemaListResponse
+    DatabaseSchemaListResponse, AIAnalyzeRequest, AIAnalyzeResponse
 )
 from schemas.response import BaseResponse
 from services.student_service import student_service
@@ -285,4 +285,48 @@ async def get_database_schemas(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取数据库模式列表失败: {str(e)}"
+        )
+
+@student_router.post("/answer/ai-analyze", response_model=AIAnalyzeResponse, summary="AI分析SQL语句")
+async def ai_analyze_sql(
+    request: AIAnalyzeRequest,
+    current_user: dict = Depends(get_current_student),
+    db: Session = Depends(get_db)
+):
+    """
+    AI智能分析题目解答情况
+
+    需要用户身份的JWT认证令牌
+
+    请求参数：
+    - problem_id: 题目ID
+    - answer_content: 学生提交的答案内容（SQL或其他文字）
+
+    返回：
+    - code: 状态码（200表示成功）
+    - message: 响应消息
+    - ai_content: AI分析内容
+    """
+    try:
+        from services.ai_service import ai_service
+
+        # 调用AI服务进行分析
+        ai_content = ai_service.analyze_sql_answer(
+            problem_id=request.problem_id,
+            answer_content=request.answer_content,
+            student_id=current_user["id"],
+            db=db
+        )
+
+        return AIAnalyzeResponse(
+            code=200,
+            message="请求成功！",
+            ai_content=ai_content
+        )
+
+    except Exception as e:
+        return AIAnalyzeResponse(
+            code=500,
+            message=f"AI分析失败: {str(e)}",
+            ai_content="AI分析服务暂时不可用，请稍后再试。"
         )
