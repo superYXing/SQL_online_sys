@@ -22,8 +22,7 @@ class UserManagementService:
     def create_student(self, student_id: str, student_name: str, class_: str,
                       student_password: str, current_user: dict, db: Session) -> Tuple[bool, str, Optional[StudentInfo]]:
         """创建学生"""
-        # 验证管理员权限
-        self._verify_admin_role(current_user)
+         
 
         try:
             # 检查学生ID是否已存在
@@ -60,8 +59,7 @@ class UserManagementService:
     def get_students(self, page: int = 1, limit: int = 20, search: Optional[str] = None,
                     class_filter: Optional[str] = None, current_user: dict = None, db: Session = None) -> StudentListResponse:
         """获取学生列表"""
-        # 验证管理员权限
-        self._verify_admin_role(current_user)
+        
 
         try:
             query = db.query(Student)
@@ -109,8 +107,7 @@ class UserManagementService:
 
     def get_student_by_id(self, student_id: str, current_user: dict, db: Session) -> Optional[StudentInfo]:
         """根据ID获取学生信息"""
-        # 验证管理员权限
-        self._verify_admin_role(current_user)
+         
 
         try:
             student = db.query(Student).filter(Student.student_id == student_id).first()
@@ -132,8 +129,7 @@ class UserManagementService:
                       class_: Optional[str] = None, student_password: Optional[str] = None,
                       current_user: dict = None, db: Session = None) -> Tuple[bool, str, Optional[StudentInfo]]:
         """更新学生信息"""
-        # 验证管理员权限
-        self._verify_admin_role(current_user)
+         
 
         try:
             student = db.query(Student).filter(Student.student_id == student_id).first()
@@ -167,8 +163,7 @@ class UserManagementService:
 
     def delete_student(self, student_id: str, current_user: dict, db: Session) -> Tuple[bool, str]:
         """删除学生"""
-        # 验证管理员权限
-        self._verify_admin_role(current_user)
+         
 
         try:
             student = db.query(Student).filter(Student.student_id == student_id).first()
@@ -177,10 +172,10 @@ class UserManagementService:
             
             # 检查是否有关联的答题记录或选课记录
             # 注意：这里需要根据实际的关系来检查
-            # if hasattr(student, 'answer_records') and student.answer_records:
-            #     return False, "该学生有关联的答题记录，无法删除"
-            # if hasattr(student, 'course_selections') and student.course_selections:
-            #     return False, "该学生有关联的选课记录，无法删除"
+            if hasattr(student, 'answer_records') and student.answer_records:
+                return False, "该学生有关联的答题记录，无法删除"
+            if hasattr(student, 'course_selections') and student.course_selections:
+                return False, "该学生有关联的选课记录，无法删除"
             
             db.delete(student)
             db.commit()
@@ -196,8 +191,7 @@ class UserManagementService:
     def create_teacher(self, teacher_id: str, teacher_name: str, teacher_password: str,
                       current_user: dict, db: Session) -> Tuple[bool, str, Optional[TeacherInfo]]:
         """创建教师"""
-        # 验证管理员权限
-        self._verify_admin_role(current_user)
+         
 
         try:
 
@@ -233,8 +227,7 @@ class UserManagementService:
     def get_teachers(self, page: int = 1, limit: int = 20, search: Optional[str] = None,
                     current_user: dict = None, db: Session = None) -> TeacherListResponse:
         """获取教师列表"""
-        # 验证管理员权限
-        self._verify_admin_role(current_user)
+         
 
         try:
             query = db.query(Teacher)
@@ -277,8 +270,7 @@ class UserManagementService:
 
     def get_teacher_by_id(self, teacher_id: str, current_user: dict, db: Session) -> Optional[TeacherInfo]:
         """根据ID获取教师信息"""
-        # 验证管理员权限
-        self._verify_admin_role(current_user)
+         
 
         try:
             teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
@@ -299,8 +291,7 @@ class UserManagementService:
                       teacher_password: Optional[str] = None, current_user: dict = None,
                       db: Session = None) -> Tuple[bool, str, Optional[TeacherInfo]]:
         """更新教师信息"""
-        # 验证管理员权限
-        self._verify_admin_role(current_user)
+         
 
         try:
             teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
@@ -331,8 +322,7 @@ class UserManagementService:
 
     def delete_teacher(self, teacher_id: str, current_user: dict, db: Session) -> Tuple[bool, str]:
         """删除教师"""
-        # 验证管理员权限
-        self._verify_admin_role(current_user)
+         
 
         try:
             teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()

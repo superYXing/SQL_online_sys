@@ -6,7 +6,8 @@ from schemas.teacher import (
     TeacherProfileResponse, CourseInfo, TeacherCourseListResponse,
     StudentGradeInfo, CourseGradeResponse, StudentCreateRequest,
     StudentCreateResponse, ImportFailDetail, StudentImportResponse,
-    ScoreCalculateRequest, StudentScoreInfo, ScoreUpdateResponse, ScoreListResponse
+    ScoreCalculateRequest, StudentScoreInfo, ScoreUpdateResponse, ScoreListResponse,
+    TeacherStudentInfo, TeacherStudentListResponse, ScoreExportRequest, ExportStudentInfo
 )
 from datetime import datetime
 import pandas as pd
@@ -494,7 +495,7 @@ class TeacherService:
                 scorelist=[]
             )
 
-    def export_scores(self, teacher_id: str, course_id: str, class_id: Optional[str] = None,
+    def export_scores(self, teacher_id: str, course_id: int, class_id: Optional[str] = None,
                      db: Session = None) -> Optional[Dict]:
         """导出分数结果"""
         try:
@@ -567,6 +568,157 @@ class TeacherService:
         except Exception as e:
             print(f"导出分数失败: {e}")
             return None
+
+    def get_students_by_semester(self, page: int = 1, limit: int = 20, search: Optional[str] = None,
+                                class_filter: Optional[str] = None, semester_id: Optional[int] = None,
+                                db: Session = None) -> TeacherStudentListResponse:
+        """根据学期获取学生列表"""
+        try:
+            from sqlalchemy import or_
+
+            # 构建基础查询
+            query = db.query(
+                Student.student_id,
+                Student.student_name,
+                Student.class_,
+                Teacher.teacher_name,
+                Semester.semester_name,
+                Course.course_id
+            ).select_from(CourseSelection).join(
+                Student, CourseSelection.student_id == Student.id
+            ).join(
+                Course, CourseSelection.course_id == Course.course_id
+            ).join(
+                Teacher, Course.teacher_id == Teacher.id
+            ).join(
+                Semester, Course.semester_id == Semester.semester_id
+            )
+
+            # 如果指定了学期ID，则过滤
+            if semester_id is not None:
+                query = query.filter(Semester.semester_id == semester_id)
+
+            # 搜索功能
+            if search:
+                query = query.filter(
+                    or_(
+                        Student.student_id.contains(search),
+                        Student.student_name.contains(search)
+                    )
+                )
+
+            # 班级过滤
+            if class_filter:
+                query = query.filter(Student.class_.contains(class_filter))
+
+            # 获取总数
+            total = query.count()
+
+            # 分页查询
+            offset = (page - 1) * limit
+            results = query.offset(offset).limit(limit).all()
+
+            # 构建响应数据
+            student_list = []
+            for result in results:
+                student_list.append(TeacherStudentInfo(
+                    student_id=result.student_id,
+                    student_name=result.student_name or "",
+                    class_=result.class_ or "",
+                    teacher_name=result.teacher_name or "",
+                    semester_name=result.semester_name or "",
+                    course_id=str(result.course_id) if result.course_id else ""
+                ))
+
+            return TeacherStudentListResponse(
+                students=student_list,
+                total=total,
+                page=page,
+                limit=limit
+            )
+
+        except Exception as e:
+            print(f"获取学生列表失败: {e}")
+            return TeacherStudentListResponse(students=[], total=0, page=page, limit=limit)
+
+    def export_scores_to_excel(self, students_data: List[ExportStudentInfo]) -> bytes:
+        """将学生分数数据导出为Excel文件"""
+        try:
+            import io
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, Alignment, PatternFill
+            from datetime import datetime
+
+            # 创建工作簿
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "成绩表"
+
+            # 设置表头
+            headers = ["学号", "姓名", "班级", "课序号", "状态", "总分数"]
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = Font(bold=True, color="FFFFFF")
+                cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            # 填充数据
+            for row, student in enumerate(students_data, 2):
+                ws.cell(row=row, column=1, value=student.student_id)
+                ws.cell(row=row, column=2, value=student.student_name)
+                ws.cell(row=row, column=3, value=student.class_)
+                ws.cell(row=row, column=4, value=student.course_id)
+                ws.cell(row=row, column=5, value=student.status)
+                ws.cell(row=row, column=6, value=student.total_score)
+
+                # 设置数据行样式
+                for col in range(1, 7):
+                    cell = ws.cell(row=row, column=col)
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            # 调整列宽
+            column_widths = [15, 10, 15, 8, 8, 10]
+            for col, width in enumerate(column_widths, 1):
+                ws.column_dimensions[chr(64 + col)].width = width
+
+            # 保存到内存
+            excel_buffer = io.BytesIO()
+            wb.save(excel_buffer)
+            excel_buffer.seek(0)
+
+            return excel_buffer.getvalue()
+
+        except Exception as e:
+            print(f"生成Excel文件失败: {e}")
+            raise Exception(f"生成Excel文件失败: {str(e)}")
+
+    def generate_export_filename(self, students_data: List[ExportStudentInfo]) -> str:
+        """生成导出文件名"""
+        try:
+            from datetime import datetime
+
+            if not students_data:
+                return f"成绩表-{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+            # 获取学期和班级信息（这里简化处理，实际可以从数据库查询）
+            first_student = students_data[0]
+            class_name = first_student.class_
+
+            # 提取班级中的数字部分作为班级标识
+            import re
+            class_match = re.search(r'(\d+)', class_name)
+            class_num = class_match.group(1) if class_match else "未知班级"
+
+            # 生成文件名：学期-班级-成绩表.xlsx
+            current_year = datetime.now().year
+            semester = f"{current_year}年春季"  # 可以根据实际情况调整
+            filename = f"{semester}-{class_num}班-成绩表.xlsx"
+
+            return filename
+
+        except Exception as e:
+            print(f"生成文件名失败: {e}")
+            return f"成绩表-{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
 # 全局教师服务实例
 teacher_service = TeacherService()

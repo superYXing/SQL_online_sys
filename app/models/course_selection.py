@@ -8,7 +8,6 @@ class CourseSelection(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     student_id = Column(Integer, ForeignKey("student.id"), nullable=False)
-    date_id = Column(String(10), nullable=False)
     course_id = Column(Integer, ForeignKey("course.course_id"), nullable=False)
     score = Column(Integer, nullable=False)
 
