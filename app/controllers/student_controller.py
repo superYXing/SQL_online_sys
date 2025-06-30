@@ -140,6 +140,7 @@ async def submit_answer(
     请求参数：
     - problem_id: 题目ID
     - answer_content: 学生提交的SQL答案
+    - engine_type: 数据库引擎类型（可选，包括mysql/postgresql/opengauss，默认mysql）
 
     注意：提交时间戳由服务器自动生成
 
@@ -154,6 +155,7 @@ async def submit_answer(
             student_id=current_user["id"],
             problem_id=answer_data.problem_id,
             answer_content=answer_data.answer_content,
+            engine_type=answer_data.engine_type or "mysql",
             db=db
         )
 
@@ -227,65 +229,11 @@ async def get_answer_records(
             detail=f"获取答题记录失败: {str(e)}"
         )
 
-@student_router.get("/problem/list", response_model=ProblemListResponse, summary="获取题目列表")
-async def get_problem_list(
-    schema_id: Optional[int] = Query(None, description="数据库模式ID，不指定则返回所有题目"),
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    获取题目列表
+# 题目列表接口已移至 /public 路径
+# 请使用 GET /public/problem/list 替代此接口
 
-    支持所有角色访问（学生、教师、管理员）
-
-    查询参数：
-    - schema_id: 数据库模式ID（可选），不指定则返回所有题目
-
-    返回：
-    - problems: 题目列表
-    - total: 总题目数
-    - schema_id: 查询的模式ID
-    """
-    try:
-        # 获取题目列表
-        problems = student_service.get_problem_list(
-            schema_id=schema_id,
-            db=db
-        )
-
-        return problems
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取题目列表失败: {str(e)}"
-        )
-
-@student_router.get("/schemas", response_model=DatabaseSchemaListResponse, summary="获取数据库模式列表")
-async def get_database_schemas(
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    获取数据库模式列表
-
-    支持所有角色访问（学生、教师、管理员）
-
-    返回：
-    - schemas: 数据库模式列表
-    - total: 总模式数
-    """
-    try:
-        # 获取数据库模式列表
-        schemas = student_service.get_database_schemas(db=db)
-
-        return schemas
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取数据库模式列表失败: {str(e)}"
-        )
+# 数据库模式列表接口已移至 /public 路径
+# 请使用 GET /public/schemas 替代此接口
 
 @student_router.post("/answer/ai-analyze", response_model=AIAnalyzeResponse, summary="AI分析SQL语句")
 async def ai_analyze_sql(

@@ -130,7 +130,7 @@ class StudentService:
             print(f"获取学生数据面板失败: {e}")
             return StudentDashboardResponse(problems=[])
 
-    def submit_answer(self, student_id: str, problem_id: int, answer_content: str, db: Session) -> Tuple[bool, str, Optional[int]]:
+    def submit_answer(self, student_id: str, problem_id: int, answer_content: str, db: Session, engine_type: str = "mysql") -> Tuple[bool, str, Optional[int]]:
         """提交答题结果"""
         try:
             # 首先验证学生是否存在
@@ -145,16 +145,22 @@ class StudentService:
 
             # TODO: 实现SQL语句正确性判断逻辑
             # 根据接口文档要求，需要实现以下功能：
-            # 1. 执行学生提交的SQL语句
+            # 1. 根据engine_type选择对应的数据库引擎执行SQL语句
             # 2. 与题目的标准答案或预期结果进行对比
             # 3. 判断答案是否正确
             # 4. 可能的实现方式：
+            #    - 根据engine_type连接到对应数据库（mysql/postgresql/opengauss）
             #    - 执行SQL并对比查询结果
             #    - 使用SQL解析器分析语法和语义
             #    - 与标准答案进行模式匹配
 
             # 目前先简单模拟：如果SQL包含SELECT关键字就认为是正确的
+            # 后续可以根据engine_type实现不同数据库的SQL执行逻辑
             is_correct = 1 if "SELECT" in answer_content.upper() else 0
+
+            # 记录使用的数据库引擎类型（可以存储到数据库中用于后续分析）
+            print(f"使用数据库引擎: {engine_type}")
+            print(f"提交的SQL: {answer_content}")
 
             # 创建答题记录，使用当前服务器时间作为时间戳
             current_time = datetime.now()

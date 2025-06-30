@@ -1,10 +1,11 @@
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
-from models import Semester, DateRange, DatabaseSchema
+from models import Semester, DateRange, DatabaseSchema, Problem
 from schemas.public import (
     CurrentSemesterResponse, SemesterInfo, SemesterListResponse,
-    SystemInfoResponse, DatabaseSchemaPublicInfo, DatabaseSchemaPublicListResponse
+    SystemInfoResponse, DatabaseSchemaPublicInfo, DatabaseSchemaPublicListResponse,
+    ProblemPublicInfo, ProblemPublicListResponse
 )
 from datetime import datetime, date
 
@@ -168,7 +169,7 @@ class PublicService:
             ).filter(
                 Semester.semester_id == semester_id
             ).first()
-            
+
             if semester_info:
                 return {
                     "semester_id": semester_info.semester_id,
@@ -176,12 +177,52 @@ class PublicService:
                     "begin_date": semester_info.begin_date,
                     "end_date": semester_info.end_date
                 }
-            
+
             return None
-            
+
         except Exception as e:
             print(f"获取学期日期范围失败: {e}")
             return None
+
+    def get_public_problem_list(self, schema_id: Optional[int] = None, db: Session = None) -> ProblemPublicListResponse:
+        """获取公共题目列表"""
+        try:
+            query = db.query(Problem)
+            schema_name = None
+
+            # 如果指定了schema_id，则过滤并获取模式名称
+            if schema_id is not None:
+                query = query.filter(Problem.schema_id == schema_id)
+                schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == schema_id).first()
+                schema_name = schema.schema_name if schema else "未知模式"
+
+            problems = query.all()
+
+            # 构建响应数据
+            problem_list = []
+            for problem in problems:
+                problem_list.append(ProblemPublicInfo(
+                    problem_id=problem.problem_id,
+                    problem_content=problem.problem_content or "",
+                    is_required=problem.is_required or 0,
+                    schema_id=problem.schema_id or 0
+                ))
+
+            return ProblemPublicListResponse(
+                problems=problem_list,
+                total=len(problem_list),
+                schema_id=schema_id,
+                schema_name=schema_name
+            )
+
+        except Exception as e:
+            print(f"获取公共题目列表失败: {e}")
+            return ProblemPublicListResponse(
+                problems=[],
+                total=0,
+                schema_id=schema_id,
+                schema_name=schema_name
+            )
 
 # 全局公共服务实例
 public_service = PublicService()

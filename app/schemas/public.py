@@ -6,7 +6,7 @@ class CurrentSemesterResponse(BaseModel):
     """当前学期响应模型"""
     semester_id: int
     semester_name: str
-    
+
     class Config:
         from_attributes = True
         json_schema_extra = {
@@ -15,6 +15,26 @@ class CurrentSemesterResponse(BaseModel):
                 "semester_name": "2024年第一学期"
             }
         }
+
+class ProblemPublicInfo(BaseModel):
+    """公共题目信息模型"""
+    problem_id: int
+    problem_content: Optional[str]
+    is_required: int = 0
+    schema_id: int = 0
+
+    class Config:
+        from_attributes = True
+
+class ProblemPublicListResponse(BaseModel):
+    """公共题目列表响应模型"""
+    problems: List[ProblemPublicInfo]
+    total: int
+    schema_id: Optional[int] = None
+    schema_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 class SemesterInfo(BaseModel):
     """学期信息模型"""

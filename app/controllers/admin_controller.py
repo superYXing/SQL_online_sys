@@ -16,6 +16,9 @@ from services.auth_dependency import get_current_admin, get_current_user
 
 admin_router = APIRouter(prefix="/admin", tags=["管理员"])
 
+# 当前学期接口已移至 /public 路径
+# 请使用 GET /public/currentSemester 替代此接口
+
 @admin_router.put("/semester/time", response_model=SemesterUpdateResponse, summary="修改学期时间")
 async def update_semester_time(
     request_data: SemesterUpdateRequest,

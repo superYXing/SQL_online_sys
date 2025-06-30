@@ -52,12 +52,14 @@ class AnswerSubmitRequest(BaseModel):
     """答题提交请求模型"""
     problem_id: int
     answer_content: str
+    engine_type: Optional[str] = "mysql"  # 可选，包括mysql/postgresql/opengauss
 
     class Config:
         json_schema_extra = {
             "example": {
                 "problem_id": 5,
-                "answer_content": "SELECT * FROM employees;"
+                "answer_content": "SELECT * FROM employees;",
+                "engine_type": "mysql"
             }
         }
 

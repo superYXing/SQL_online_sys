@@ -4,7 +4,7 @@ from typing import Optional
 from models.base import get_db
 from schemas.public import (
     CurrentSemesterResponse, SemesterListResponse, SystemInfoResponse,
-    DatabaseSchemaPublicListResponse
+    DatabaseSchemaPublicListResponse, ProblemPublicListResponse
 )
 from services.public_service import public_service
 from services.auth_dependency import get_current_user
@@ -104,9 +104,9 @@ async def get_database_schemas(
 ):
     """
     获取所有数据库模式列表（公共访问）
-    
+
     需要登录认证（所有角色可访问）
-    
+
     返回：
     - schemas: 数据库模式列表
     - total: 总模式数
@@ -114,11 +114,46 @@ async def get_database_schemas(
     try:
         schemas = public_service.get_public_database_schemas(db=db)
         return schemas
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取数据库模式列表失败: {str(e)}"
+        )
+
+@public_router.get("/problem/list", response_model=ProblemPublicListResponse, summary="获取题目列表")
+async def get_problem_list(
+    schema_id: Optional[int] = Query(None, description="数据库模式ID，不指定则返回所有题目"),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取题目列表（公共访问）
+
+    需要登录认证（所有角色可访问）
+
+    查询参数：
+    - schema_id: 数据库模式ID（可选），不指定则返回所有题目
+
+    返回：
+    - problems: 题目列表
+    - total: 总题目数
+    - schema_id: 查询的模式ID
+    - schema_name: 模式名称（如果指定了schema_id）
+    """
+    try:
+        # 获取题目列表
+        problems = public_service.get_public_problem_list(
+            schema_id=schema_id,
+            db=db
+        )
+
+        return problems
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取题目列表失败: {str(e)}"
         )
 
 @public_router.get("/semester/{semester_id}/info", summary="获取指定学期信息")
