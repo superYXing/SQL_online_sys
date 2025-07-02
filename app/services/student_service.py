@@ -7,6 +7,8 @@ from schemas.student import (
     ProblemItem, ProblemListResponse, DatabaseSchemaItem, DatabaseSchemaListResponse,
     StudentDashboardItem, StudentDashboardResponse
 )
+from services.database_engine_service import database_engine_service
+from services.sql_method_service import sql_method_service
 from datetime import datetime
 
 class StudentService:
@@ -55,10 +57,10 @@ class StudentService:
 
     def get_student_rank(self, db: Session, limit: int = 10) -> List[Dict]:
         """获取学生排名"""
-        # 使用正确的CASE WHEN语法
+        # 使用正确的CASE WHEN语法，修正字段名为result_type
         correct_count = func.sum(
             case(
-                (AnswerRecord.is_correct == 1, 1),
+                (AnswerRecord.result_type == 0, 1),
                 else_=0
             )
         ).label("correct_count")
@@ -99,29 +101,50 @@ class StudentService:
     def get_student_dashboard(self, student_id: str, problem_id: int, db: Session) -> StudentDashboardResponse:
         """获取学生对特定题目的答题情况"""
         try:
-            # 查询学生对特定题目的答题情况，使用正确的case语法
-            result = db.query(
+            # 首先获取学生的内部ID
+            student = db.query(Student).filter(Student.student_id == student_id).first()
+            if not student:
+                return StudentDashboardResponse(problems=[])
+
+            # 查询基本统计信息
+            basic_stats = db.query(
                 func.count().label("submit_count"),  # 总提交次数
-                func.count(case((AnswerRecord.is_correct == 1, 1))).label("correct_count"),  # 正确次数
-                func.count(case((AnswerRecord.is_correct == 0, 1))).label("wrong_count"),  # 错误次数
-                func.count(distinct(case((AnswerRecord.is_correct == 1, AnswerRecord.answer_content)))).label("correct_method_count")  # 正确方法数
-            ).select_from(AnswerRecord).outerjoin(
-                Student, AnswerRecord.student_id == Student.id
+                func.count(case((AnswerRecord.result_type == 0, 1))).label("correct_count"),  # 正确次数
+                func.count(case((AnswerRecord.result_type != 0, 1))).label("wrong_count"),  # 错误次数
+                func.count(case((AnswerRecord.result_type == 1, 1))).label("syntax_error_count"),  # 语法错误数
+                func.count(case((AnswerRecord.result_type == 2, 1))).label("result_error_count"),  # 结果错误数
             ).filter(
-                Student.student_id == student_id,
+                AnswerRecord.student_id == student.id,
                 AnswerRecord.problem_id == problem_id
             ).first()
+
+            # 查询方法相关统计
+            # 获取所有不同的答案内容及其出现次数
+            method_stats = db.query(
+                AnswerRecord.answer_content,
+                func.count().label("method_count")
+            ).filter(
+                AnswerRecord.student_id == student.id,
+                AnswerRecord.problem_id == problem_id
+            ).group_by(AnswerRecord.answer_content).all()
+
+            # 计算方法数量（不同答案内容的数量）
+            correct_method_count = len(method_stats)
+
+            # 计算重复方法数（每个方法重复次数之和，减去方法总数）
+            total_submissions = sum(stat.method_count for stat in method_stats)
+            repeat_method_count = total_submissions - correct_method_count if correct_method_count > 0 else 0
 
             # 构建响应数据
             dashboard_item = StudentDashboardItem(
                 problem_id=problem_id,
-                submit_count=result.submit_count if result else 0,
-                correct_count=result.correct_count if result else 0,
-                wrong_count=result.wrong_count if result else 0,
-                correct_method_count=result.correct_method_count if result else 0,
-                repeat_method_count=0,  # 默认返回0，暂不添加sql查询逻辑
-                syntax_error_count=0,    # 默认返回0，暂不添加sql查询逻辑
-                result_error_count=0     # 默认返回0，暂不添加sql查询逻辑
+                submit_count=basic_stats.submit_count if basic_stats else 0,
+                correct_count=basic_stats.correct_count if basic_stats else 0,
+                wrong_count=basic_stats.wrong_count if basic_stats else 0,
+                correct_method_count=correct_method_count,
+                repeat_method_count=repeat_method_count,
+                syntax_error_count=basic_stats.syntax_error_count if basic_stats else 0,
+                result_error_count=basic_stats.result_error_count if basic_stats else 0
             )
 
             return StudentDashboardResponse(problems=[dashboard_item])
@@ -143,24 +166,48 @@ class StudentService:
             if not problem:
                 return False, "题目不存在", None
 
-            # TODO: 实现SQL语句正确性判断逻辑
-            # 根据接口文档要求，需要实现以下功能：
-            # 1. 根据engine_type选择对应的数据库引擎执行SQL语句
-            # 2. 与题目的标准答案或预期结果进行对比
-            # 3. 判断答案是否正确
-            # 4. 可能的实现方式：
-            #    - 根据engine_type连接到对应数据库（mysql/postgresql/opengauss）
-            #    - 执行SQL并对比查询结果
-            #    - 使用SQL解析器分析语法和语义
-            #    - 与标准答案进行模式匹配
+            # 检查是否有标准答案
+            if not problem.example_sql:
+                return False, "题目缺少标准答案", None
 
-            # 目前先简单模拟：如果SQL包含SELECT关键字就认为是正确的
-            # 后续可以根据engine_type实现不同数据库的SQL执行逻辑
-            is_correct = 1 if "SELECT" in answer_content.upper() else 0
-
-            # 记录使用的数据库引擎类型（可以存储到数据库中用于后续分析）
+            # 记录使用的数据库引擎类型
             print(f"使用数据库引擎: {engine_type}")
             print(f"提交的SQL: {answer_content}")
+            print(f"标准答案: {problem.example_sql}")
+
+            # 初始化判断结果
+            result_type = 0  # 0:正确  1：语法错误  2：结果错误
+            message = "结果正确"
+            method_count = None
+
+            # 1. 首先检查学生SQL的语法
+            success, error_msg, student_result = database_engine_service.execute_sql(answer_content, engine_type)
+
+            if not success:
+                # 语法错误
+                result_type = 1
+                message = f"语法错误: {error_msg}"
+            else:
+                # 语法正确，进行结果比较
+                # 根据题目的is_orderd字段选择比较方式
+                is_ordered = problem.is_orderd if problem.is_orderd is not None else 0
+
+                if is_ordered == 0:
+                    # 行无序比较，使用EXCEPT ALL
+                    result_match, compare_msg = database_engine_service.compare_results_unordered(
+                        answer_content, problem.example_sql, engine_type
+                    )
+                else:
+                    # 行有序比较，使用JSON数组比较
+                    result_match, compare_msg = database_engine_service.compare_results_ordered(
+                        answer_content, problem.example_sql, engine_type
+                    )
+
+                if not result_match:
+                    result_type = 2
+                    message = "结果错误"
+                else:
+                    message = "结果正确"
 
             # 创建答题记录，使用当前服务器时间作为时间戳
             current_time = datetime.now()
@@ -168,7 +215,8 @@ class StudentService:
                 student_id=student.id,
                 problem_id=problem_id,
                 answer_content=answer_content,
-                is_correct=is_correct,
+                result_type=result_type,
+                # method_count=method_count if result_type == 0 else None,
                 timestep=current_time
             )
 
@@ -176,8 +224,9 @@ class StudentService:
             db.commit()
             db.refresh(answer_record)
 
-            message = "答案正确！" if is_correct else "答案错误,再思考一下！。"
-            return bool(is_correct), message, answer_record.id
+            # 返回结果
+            is_correct = (result_type == 0)
+            return is_correct, message, answer_record.id
 
         except Exception as e:
             db.rollback()
@@ -218,7 +267,7 @@ class StudentService:
                     answer_id=record.id,
                     problem_id=record.problem_id,
                     answer_content=record.answer_content,
-                    is_correct=record.is_correct,
+                    is_correct=record.result_type,  # 使用result_type字段
                     submit_time=record.timestep
                 ))
 

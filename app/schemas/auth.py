@@ -10,9 +10,9 @@ class LoginRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "account": "100002",
-                "password": "&9V9msf*",
-                "role": "teacher"
+                "account": "20252261107",
+                "password": "_s7yrhXq",
+                "role": "student"
             }
         }
 

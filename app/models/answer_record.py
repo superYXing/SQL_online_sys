@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint, String, DateTime
+from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint, String, DateTime, SmallInteger
 from sqlalchemy.orm import relationship
 from models.base import Base
 
@@ -9,7 +9,7 @@ class AnswerRecord(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     student_id = Column(Integer, ForeignKey("student.id"), nullable=False)
     problem_id = Column(Integer, ForeignKey("problem.problem_id"), nullable=False)
-    is_correct = Column(Integer, nullable=False)
+    result_type = Column(SmallInteger, nullable=False,comment="0:正确  1：语法错误  2：结果错误")
     answer_content = Column(String(255), nullable=False)
     timestep = Column(DateTime, nullable=False)
 

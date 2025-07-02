@@ -31,15 +31,27 @@ class StudentDashboardItem(BaseModel):
     """学生数据面板项模型"""
     problem_id: int
     submit_count: int  # 总提交次数
-    correct_method_count: int  # 方法次数
-    wrong_count: int  # 错误次数
     correct_count: int  # 正确次数
-    repeat_method_count: int = 0  # 默认返回0，暂不添加sql查询逻辑
-    syntax_error_count: int = 0  # 默认返回0，暂不添加sql查询逻辑
-    result_error_count: int = 0  # 默认返回0，暂不添加sql查询逻辑
-    
+    wrong_count: int  # 错误次数
+    correct_method_count: int  # 方法数量（不同答案内容的数量）
+    repeat_method_count: int  # 重复方法数（每个方法重复次数之和）
+    syntax_error_count: int  # 语法错误数
+    result_error_count: int  # 结果错误数
+
     class Config:
         from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "problem_id": 5,
+                "submit_count": 10,
+                "correct_count": 3,
+                "wrong_count": 7,
+                "correct_method_count": 4,
+                "repeat_method_count": 6,
+                "syntax_error_count": 2,
+                "result_error_count": 5
+            }
+        }
 
 class StudentDashboardResponse(BaseModel):
     """学生数据面板响应模型"""
@@ -47,6 +59,22 @@ class StudentDashboardResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "problems": [
+                    {
+                        "problem_id": 5,
+                        "submit_count": 10,
+                        "correct_count": 3,
+                        "wrong_count": 7,
+                        "correct_method_count": 4,
+                        "repeat_method_count": 6,
+                        "syntax_error_count": 2,
+                        "result_error_count": 5
+                    }
+                ]
+            }
+        }
 
 class AnswerSubmitRequest(BaseModel):
     """答题提交请求模型"""
@@ -71,6 +99,13 @@ class AnswerSubmitResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "is_correct": True,
+                "message": "结果正确",
+                "answer_id": 123
+            }
+        }
 
 class AnswerRecordItem(BaseModel):
     """答题记录项模型"""

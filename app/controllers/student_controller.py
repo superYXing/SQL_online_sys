@@ -90,34 +90,45 @@ async def get_student_rank(
 @student_router.get("/dashboard", response_model=schemas.student.StudentDashboardResponse, summary="学生数据面板")
 async def get_student_dashboard(
     problem_id: int,
-    current_user: dict = Depends(get_current_student),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     获取学生对某一道题目的答题情况
-    
-    需要学生身份的JWT认证令牌
-    
+
+    需要登录认证（所有角色都可访问）
+
     参数：
     - problem_id: 题目ID
-    
+
     返回学生对该题目的答题情况：
     - submit_count: 总提交次数
     - correct_count: 正确次数
     - wrong_count: 错误次数
-    - correct_method_count: 方法次数
-    - repeat_method_count: 重复方法数（默认0）
-    - syntax_error_count: 语法错误数（默认0）
-    - result_error_count: 结果错误数（默认0）
+    - correct_method_count: 方法数量（不同答案内容的数量）
+    - repeat_method_count: 重复方法数（每个方法重复次数之和）
+    - syntax_error_count: 语法错误数
+    - result_error_count: 结果错误数
+
+    注意：如果当前用户是学生，则查询自己的数据；如果是教师或管理员，需要额外指定学生ID
     """
     try:
+        # 根据用户角色确定要查询的学生ID
+        if current_user.get("role") == "student":
+            # 学生查询自己的数据
+            target_student_id = current_user["id"]
+        else:
+            # 教师或管理员需要指定学生ID（这里暂时使用当前用户ID，实际应该从请求参数获取）
+            # TODO: 如果需要支持教师/管理员查询指定学生的数据，需要添加student_id参数
+            target_student_id = current_user["id"]
+
         # 获取学生数据面板
         dashboard = student_service.get_student_dashboard(
-            student_id=current_user["id"],
+            student_id=target_student_id,
             problem_id=problem_id,
             db=db
         )
-        
+
         return dashboard
 
     except Exception as e:
@@ -155,8 +166,8 @@ async def submit_answer(
             student_id=current_user["id"],
             problem_id=answer_data.problem_id,
             answer_content=answer_data.answer_content,
-            engine_type=answer_data.engine_type or "mysql",
-            db=db
+            db=db,
+            engine_type=answer_data.engine_type or "mysql"
         )
 
         if answer_id is None:

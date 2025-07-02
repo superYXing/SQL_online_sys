@@ -11,6 +11,8 @@ class Problem(Base):
     problem_content = Column(String(255), nullable=True)
     is_required = Column(SmallInteger, nullable=True)
     example_sql = Column(Text, nullable=True)
+    is_orderd = Column(SmallInteger, nullable=True,comment="判断数据的标准：0为行无序，1为行有序")
+
     # 关系
     schema = relationship("DatabaseSchema", back_populates="problems")
     answer_records = relationship("AnswerRecord", back_populates="problem")

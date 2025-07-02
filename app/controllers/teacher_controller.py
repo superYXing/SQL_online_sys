@@ -657,53 +657,7 @@ async def execute_sql_query(
             error_message=f"SQL执行失败: {str(e)}"
         )
 
-# 获取所有学期信息接口
-@teacher_router.get("/semester/list", response_model=SemesterListResponse, summary="获取所有学期信息")
-async def get_semester_list(
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    获取所有学期信息
 
-    需要登录认证（只有教师可访问）
-
-    返回：
-    - semesters: 学期列表，包含从date_range表获取的begin_date和end_date
-    - total: 总学期数
-    """
-    try:
-        from models import Semester, DateRange
-
-        # 联表查询获取学期信息和对应的日期范围
-        semester_data = db.query(
-            Semester.semester_id,
-            Semester.semester_name,
-            DateRange.begin_date,
-            DateRange.end_date
-        ).outerjoin(
-            DateRange, Semester.date_id == DateRange.date_id
-        ).all()
-
-        semester_list = []
-        for semester in semester_data:
-            semester_list.append({
-                "semester_id": semester.semester_id,
-                "semester_name": semester.semester_name or "",
-                "start_date": semester.begin_date.strftime("%Y-%m-%d") if semester.begin_date else None,
-                "end_date": semester.end_date.strftime("%Y-%m-%d") if semester.end_date else None
-            })
-
-        return SemesterListResponse(
-            semesters=semester_list,
-            total=len(semester_list)
-        )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取学期列表失败: {str(e)}"
-        )
 
 # 态势矩阵接口
 @teacher_router.get("/dashboard/matrix", response_model=DashboardMatrixResponse, summary="查看态势矩阵接口")
