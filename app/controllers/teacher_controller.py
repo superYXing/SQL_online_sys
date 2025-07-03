@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Path
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Path, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any
@@ -13,7 +13,7 @@ from schemas.teacher import (
     ScoreCalculateRequest, ScoreUpdateResponse, ScoreListResponse,
     TeacherProblemListResponse, TeacherSchemaListResponse,
     SQLQueryRequest, SQLQueryResponse, SemesterListResponse,
-    DashboardMatrixResponse, StudentProblemStatsRequest, StudentProblemStatsResponse,
+    StudentProblemStatsRequest, StudentProblemStatsResponse,
     StudentProfileResponse, ProblemStatisticsResponse, ProblemSummaryResponse,
     DatasetExportResponse, ProblemDetailResponse, ProblemEditRequest, ProblemEditResponse,
     TeacherStudentListResponse, ScoreExportRequest, ExportStudentInfo,
@@ -78,118 +78,9 @@ async def get_teacher_profile(
             detail=f"获取教师信息失败: {str(e)}"
         )
 
-# @teacher_router.get("/courses", response_model=TeacherCourseListResponse, summary="获取教师课程列表")
-# async def get_teacher_courses(
-#     current_user: dict = Depends(get_current_teacher),
-#     db: Session = Depends(get_db)
-# ):
-#     """
-#     获取当前教师的所有课程列表
-#
-#     需要教师身份的JWT认证令牌
-#
-#     返回：
-#     - courses: 课程列表
-#     - total: 总课程数
-#     """
-#     try:
-#         # 获取教师课程列表
-#         courses = teacher_service.get_teacher_courses(
-#             teacher_id=current_user["id"],
-#             db=db
-#         )
-#
-#         return courses
-#
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"获取教师课程列表失败: {str(e)}"
-#         )
-#
-# @teacher_router.get("/courses/{course_id}/grades", response_model=CourseGradeResponse, summary="获取课程成绩")
-# async def get_course_grades(
-#     course_id: str,
-#     current_user: dict = Depends(get_current_teacher),
-#     db: Session = Depends(get_db)
-# ):
-#     """
-#     获取指定课程的学生成绩
-#
-#     需要教师身份的JWT认证令牌
-#
-#     路径参数：
-#     - course_id: 课程ID
-#
-#     返回：
-#     - course_id: 课程ID
-#     - course_name: 课程名称
-#     - students: 学生成绩列表
-#     - total_students: 总学生数
-#     """
-#     try:
-#         # 获取课程成绩
-#         grades = teacher_service.get_course_grades(
-#             teacher_id=current_user["id"],
-#             course_id=course_id,
-#             db=db
-#         )
-#
-#         if not grades:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND,
-#                 detail="课程不存在或您没有权限查看该课程"
-#             )
-#
-#         return grades
-#
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"获取课程成绩失败: {str(e)}"
-#         )
-#
-# @teacher_router.get("/courses/{course_id}/export", summary="导出课程成绩")
-# async def export_course_grades(
-#     course_id: str,
-#     current_user: dict = Depends(get_current_teacher),
-#     db: Session = Depends(get_db)
-# ):
-#     """
-#     导出指定课程的学生成绩
-#
-#     需要教师身份的JWT认证令牌
-#
-#     路径参数：
-#     - course_id: 课程ID
-#
-#     返回可用于生成Excel文件的数据
-#     """
-#     try:
-#         # 导出课程成绩
-#         export_data = teacher_service.export_course_grades(
-#             teacher_id=current_user["id"],
-#             course_id=course_id,
-#             db=db
-#         )
-#
-#         if not export_data:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND,
-#                 detail="课程不存在或您没有权限导出该课程成绩"
-#             )
-#
-#         return export_data
-#
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"导出课程成绩失败: {str(e)}"
-#         )
+# 已删除: 获取教师课程列表接口 - 功能已整合到其他接口
+# 已删除: 获取课程成绩接口 - 功能已整合到其他接口
+# 已删除: 导出课程成绩接口 - 功能已整合到其他接口
 
 # 学生管理接口
 @teacher_router.post("/students/addcourse", response_model=StudentCourseAddResponse, summary="添加学生选课信息")
@@ -627,46 +518,7 @@ async def export_scores(
 
 
 
-# 态势矩阵接口
-@teacher_router.get("/dashboard/matrix", response_model=DashboardMatrixResponse, summary="查看态势矩阵接口")
-async def get_dashboard_matrix(
-    year_term: Optional[str] = Query(None, description="学期（如 '2025春季'），不传则返回所有学期的汇总数据"),
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    返回态势矩阵数据，列为数据库模式（schema_name），学期
-
-    需要登录认证（教师角色可访问）
-
-    查询逻辑：
-    1. 在学期表里根据学期名找到学期号
-    2. 在课程表里根据学期号找到所有课程号
-    3. 在选课表里根据课程号找到所有学生号
-    4. 在答题表里根据学号找到题目数量，提交数量
-
-    参数：
-    - year_term: 学期筛选（可选），如 "2025春季"
-
-    返回：
-    - code: 状态码
-    - msg: 消息
-    - matrix: 按学期分组的统计矩阵数据
-    """
-    try:
-        # 调用服务层方法
-        result = teacher_service.get_dashboard_matrix(
-            year_term=year_term,
-            db=db
-        )
-
-        return result
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取态势矩阵失败: {str(e)}"
-        )
+# 已删除: 态势矩阵接口 - 接口已废弃
 
 # 学生题目提交情况查询接口
 @teacher_router.post("/student/problem-stats", response_model=StudentProblemStatsResponse, summary="查询学生题目提交情况")
@@ -685,7 +537,11 @@ async def get_student_problem_stats(
     - problem_ids: 题目编号列表
 
     返回：
-    - data: 学生题目统计数据列表，包含每个学生在每个题目上的提交次数和正确次数
+    - data: 学生题目统计数据列表，包含每个学生在每个题目上的：
+      - submit_count: 提交次数
+      - correct_count: 正确次数
+      - syntax_error_count: 语法错误次数
+      - result_error_count: 结果错误次数
     """
     try:
         from models import Student, Problem, AnswerRecord
@@ -727,9 +583,11 @@ async def get_student_problem_stats(
                     AnswerRecord.problem_id == problem_id_int
                 ).all()
 
-                # 统计提交次数和正确次数
+                # 统计各种类型的提交次数
                 submit_count = len(submissions)
-                correct_count = sum(1 for s in submissions if s.is_correct)
+                correct_count = sum(1 for s in submissions if s.result_type == 0)  # 使用result_type字段
+                syntax_error_count = sum(1 for s in submissions if s.result_type == 1)  # 语法错误
+                result_error_count = sum(1 for s in submissions if s.result_type == 2)  # 结果错误
 
                 # 只有当有提交记录时才添加到结果中
                 if submit_count > 0:
@@ -737,7 +595,9 @@ async def get_student_problem_stats(
                         "student_id": student_id,
                         "problem_id": problem_id_str,
                         "submit_count": submit_count,
-                        "correct_count": correct_count
+                        "correct_count": correct_count,
+                        "syntax_error_count": syntax_error_count,
+                        "result_error_count": result_error_count
                     })
 
         return StudentProblemStatsResponse(data=result_data)
@@ -750,267 +610,68 @@ async def get_student_problem_stats(
             detail=f"查询学生题目提交情况失败: {str(e)}"
         )
 
-# 获取学生信息接口
-# @teacher_router.get("/student/info", response_model=StudentInfoResponse, summary="获取学生信息")
-# async def get_student_info(
-#     student_id: str = Query(..., description="学生ID"),
-#     current_user: dict = Depends(get_current_teacher),
-#     db: Session = Depends(get_db)
-# ):
-#     """
-#     根据学生ID获取学生基本信息
-#
-#     需要教师身份的JWT认证令牌
-#
-#     查询参数：
-#     - student_id: 学生ID（学号）
-#
-#     返回：
-#     - code: 状态码
-#     - msg: 消息
-#     - data: 学生基本信息
-#     """
-#     try:
-#         from models import Student
-#
-#         # 查询学生信息
-#         student = db.query(Student).filter(Student.student_id == student_id).first()
-#         if not student:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND,
-#                 detail="学生不存在"
-#             )
-#
-#         # 构建响应数据
-#         student_data = {
-#             "student_id": student.student_id,
-#             "student_name": student.student_name or "",
-#             "class": student.class_ or ""
-#         }
-#
-#         return StudentInfoResponse(
-#             code=200,
-#             msg="查询成功",
-#             data=student_data
-#         )
-#
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"获取学生信息失败: {str(e)}"
-#         )
+# 已删除: 获取学生信息接口 - 功能已整合到其他接口
 
-# 获取学生详细信息接口
-# @teacher_router.get("/students/{student_id}", response_model=StudentDetailResponse, summary="获取学生详细信息")
-# async def get_student_detail(
-#     student_id: str = Path(..., description="学生ID"),
-#     current_user: dict = Depends(get_current_teacher),
-#     db: Session = Depends(get_db)
-# ):
-#     """
-#     获取指定学生的详细信息
-#
-#     需要教师身份的JWT认证令牌
-#
-#     路径参数：
-#     - student_id: 学生ID（学号）
-#
-#     返回：
-#     - id: 学生内部ID
-#     - student_id: 学号
-#     - student_name: 姓名
-#     - class: 班级
-#     - course_id: 课程ID
-#     """
-#     try:
-#         from models import Student, CourseSelection, Course, Semester
-#
-#         # 获取学生信息
-#         student = db.query(Student).filter(Student.student_id == student_id).first()
-#         if not student:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND,
-#                 detail="学生不存在"
-#             )
-#
-#         # 获取当前学期
-#         current_semester = db.query(Semester).order_by(Semester.semester_id.desc()).first()
-#         if not current_semester:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND,
-#                 detail="未找到当前学期"
-#             )
-#
-#         # 获取学生在当前学期的课程
-#         course_selection = db.query(CourseSelection).join(
-#             Course, CourseSelection.course_id == Course.course_id
-#         ).filter(
-#             CourseSelection.student_id == student.id,
-#             Course.semester_id == current_semester.semester_id
-#         ).first()
-#
-#         course_id = course_selection.course_id if course_selection else 0
-#
-#         return StudentDetailResponse(
-#             id=student.id,
-#             student_id=student.student_id,
-#             student_name=student.student_name,
-#             class_=student.class_,
-#             course_id=course_id
-#         )
-#
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"获取学生详细信息失败: {str(e)}"
-#         )
+# 已删除: 获取学生详细信息接口 - 功能已整合到其他接口
 
-# # 学生答题概况接口
-# @teacher_router.get("/student-profile", response_model=StudentProfileDocResponse, summary="查询学生答题概况")
-# async def get_student_profile(
-#     student_id: str = Query(..., description="学生学号"),
-#     schema_id: int = Query(..., description="数据库模式ID"),
-#     current_user: dict = Depends(get_current_teacher),
-#     db: Session = Depends(get_db)
-# ):
-#     """
-#     根据传入的student_id查询该学生的基本信息与答题概况
-#
-#     需要教师身份的JWT认证令牌
-#
-#     查询参数：
-#     - student_id: 学生学号（如：202322410112）
-#     - schema_id: 数据库模式ID
-#
-#     返回：
-#     - student_id: 学号
-#     - student_name: 姓名
-#     - class_name: 所在班级
-#     - course_id: 课程ID
-#     - correct_count: 题目正确数量
-#     - submit_count: 总提交数
-#     """
-#     try:
-#         # 调用服务层方法
-#         result = teacher_service.get_student_profile_doc(
-#             student_id=student_id,
-#             db=db
-#         )
-#
-#         if not result:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND,
-#                 detail="学生不存在或未找到相关数据"
-#             )
-#
-#         return result
-#
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"获取学生答题概况失败: {str(e)}"
-#         )
+# 学生答题概况接口
+@teacher_router.get("/student-profile", response_model=StudentProfileDocResponse, summary="查询学生答题概况")
+async def get_student_profile(
+    student_id: str = Query(..., description="学生学号"),
+    schema_id: int = Query(..., description="数据库模式ID"),
+    current_user: dict = Depends(get_current_teacher),
+    db: Session = Depends(get_db)
+):
+    """
+    根据传入的student_id和schema_id查询该学生的基本信息与答题概况
 
-# 学生题目统计汇总接口
-# @teacher_router.get("/problem/statistics", response_model=StudentProblemStatisticsResponse, summary="学生题目统计汇总")
-# async def get_problem_statistics(
-#     schema_id: int = Query(..., description="数据库模式ID"),
-#     semester_id: int = Query(..., description="学期ID"),
-#     course_id: Optional[int] = Query(None, description="课程ID（可选，如传则筛选该课程）"),
-#     current_user: dict = Depends(get_current_teacher),
-#     db: Session = Depends(get_db)
-# ):
-#     """
-#     根据数据库模式、学期，统计每个学生在每道题目的提交及正确情况
-#
-#     需要教师身份的JWT认证令牌
-#
-#     查询参数：
-#     - schema_id: 数据库模式ID（必填）
-#     - semester_id: 学期ID（必填）
-#     - course_id: 课程ID（可选，如传则筛选该课程）
-#
-#     返回：
-#     - code: 状态码
-#     - msg: 消息
-#     - data: 学生题目统计数据列表
-#     """
-#     try:
-#         from models import DatabaseSchema, Problem, AnswerRecord, Student, CourseSelection, Course
-#
-#         # 验证数据库模式是否存在
-#         schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == schema_id).first()
-#         if not schema:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND,
-#                 detail="数据库模式不存在"
-#             )
-#
-#         # 获取该模式下的所有题目
-#         problems = db.query(Problem).filter(Problem.schema_id == schema_id).all()
-#         if not problems:
-#             return StudentProblemStatisticsResponse(
-#                 code=200,
-#                 msg="查询成功",
-#                 data=[]
-#             )
-#
-#         # 构建学生查询条件
-#         student_query = db.query(Student).join(
-#             CourseSelection, Student.id == CourseSelection.student_id
-#         ).join(
-#             Course, CourseSelection.course_id == Course.course_id
-#         ).filter(
-#             Course.semester_id == semester_id
-#         )
-#
-#         # 如果指定了课程ID，则进一步筛选
-#         if course_id is not None:
-#             student_query = student_query.filter(Course.course_id == course_id)
-#
-#         students = student_query.all()
-#
-#         result_data = []
-#         for student in students:
-#             for problem in problems:
-#                 # 查询该学生在该题目上的所有提交记录
-#                 submissions = db.query(AnswerRecord).filter(
-#                     AnswerRecord.student_id == student.id,
-#                     AnswerRecord.problem_id == problem.problem_id
-#                 ).all()
-#
-#                 # 只有当有提交记录时才添加到结果中
-#                 if submissions:
-#                     submit_count = len(submissions)
-#                     correct_count = sum(1 for s in submissions if s.is_correct)
-#
-#                     result_data.append({
-#                         "student_name": student.student_name or "未知",
-#                         "class": student.class_name or "未知班级",
-#                         "problem_id": problem.problem_id,
-#                         "correct_count": correct_count,
-#                         "submit_count": submit_count
-#                     })
-#
-#         return StudentProblemStatisticsResponse(
-#             code=200,
-#             msg="查询成功",
-#             data=result_data
-#         )
-#
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"获取学生题目统计失败: {str(e)}"
-#         )
+    需要教师身份的JWT认证令牌
+
+    查询参数：
+    - student_id: 学生学号（如：202322410112）
+    - schema_id: 数据库模式ID
+
+    返回：
+    - student_id: 学号
+    - student_name: 姓名
+    - class_name: 所在班级
+    - course_id: 课程ID
+    - status: 选课状态，0为重修，1为正常
+    - correct_count: 题目正确数量
+    - submit_count: 总提交数
+
+    执行流程：
+    1. 调用public接口获取当前学期号
+    2. 根据学期号确认课程号范围
+    3. 根据学号在课程号范围里确认课程号(使用.first())
+    4. 根据数据库模式id得到题目id范围
+    5. 到答题记录表里根据学号和课程的时间范围和题目的范围确认答题的正确数量和总提交数
+    """
+    try:
+        # 调用服务层方法
+        result = teacher_service.get_student_profile_doc(
+            student_id=student_id,
+            schema_id=schema_id,
+            db=db
+        )
+
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="学生不存在或未找到相关数据"
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取学生答题概况失败: {str(e)}"
+        )
+
+# 已删除: 学生题目统计汇总接口 - 功能已整合到其他接口
 
 # 题目完成情况统计接口
 @teacher_router.get("/problem/summary", response_model=ProblemSummaryResponse, summary="获取题目完成情况统计")
@@ -1245,23 +906,20 @@ async def get_problem_detail(
                 msg="题目不存在",
                 data=ProblemDetailData(
                     problem_id=problem_id,
-                    title="",
+                    is_required=0,
+                    is_ordered=0,
                     problem_content="",
-                    example_sql="",
-                    is_required=0
+                    example_sql=""
                 )
             )
-
-        # 生成题目标题（格式：NO.x）
-        title = f"NO.{problem.problem_id}"
 
         # 构建响应数据
         problem_data = ProblemDetailData(
             problem_id=problem.problem_id,
-            title=title,
+            is_required=problem.is_required or 0,
+            is_ordered=problem.is_orderd or 0,  # 注意数据库字段名的拼写
             problem_content=problem.problem_content or "",
-            example_sql=problem.example_sql or "",
-            is_required=problem.is_required or 0
+            example_sql=problem.example_sql or ""
         )
 
         return ProblemDetailResponse(
@@ -1276,10 +934,10 @@ async def get_problem_detail(
             msg=f"获取题目详情失败: {str(e)}",
             data=ProblemDetailData(
                 problem_id=problem_id,
-                title="",
+                is_required=0,
+                is_ordered=0,
                 problem_content="",
-                example_sql="",
-                is_required=0
+                example_sql=""
             )
         )
 
@@ -1297,8 +955,9 @@ async def edit_problem(
 
     请求体：
     - problem_id: 题目ID（必填）
-    - problem_content: 题目内容（可选）
     - is_required: 是否必做（可选）
+    - is_ordered: 是否有序（可选）
+    - problem_content: 题目内容（可选）
     - example_sql: 示例SQL（可选）
 
     返回：
@@ -1317,10 +976,12 @@ async def edit_problem(
             )
 
         # 更新题目信息
-        if edit_request.problem_content is not None:
-            problem.problem_content = edit_request.problem_content
         if edit_request.is_required is not None:
             problem.is_required = edit_request.is_required
+        if edit_request.is_ordered is not None:
+            problem.is_orderd = edit_request.is_ordered  # 注意数据库字段名的拼写
+        if edit_request.problem_content is not None:
+            problem.problem_content = edit_request.problem_content
         if edit_request.example_sql is not None:
             problem.example_sql = edit_request.example_sql
 
@@ -1397,28 +1058,57 @@ async def delete_problem(
 # 数据库模式管理接口
 @teacher_router.post("/schema/create", response_model=SchemaCreateResponse, summary="创建数据库模式")
 async def create_database_schema(
-    schema_data: SchemaCreateRequest,
+    html_content: str = Form(..., description="HTML格式文本"),
+    schema_name: str = Form(..., description="数据库模式名称"),
+    sql_engine: str = Form(..., description="SQL引擎类型"),
+    sql_schema: str = Form(..., description="创建数据库模式时的名称"),
+    sql_file: UploadFile = File(..., description="SQL建表文件"),
     current_user: dict = Depends(get_current_teacher),
     db: Session = Depends(get_db)
 ):
     """
-    根据HTML格式文本创建数据库模式
+    根据HTML格式文本、数据库模式名称、SQL引擎和SQL建表文件创建数据库模式
 
     需要教师身份的JWT认证令牌
 
     请求参数：
-    - html_content: 前端输入的HTML语句
+    - html_content: HTML格式文本（必须）
+    - schema_name: 数据库模式名称（必须）
+    - sql_engine: SQL引擎类型（必须，如：mysql, postgresql, opengauss）
+    - sql_schema: 创建数据库模式时的名称（必须）
+    - sql_file: SQL建表文件（必须，.sql文件）
 
     返回：
     - code: 状态码（200表示成功）
     - msg: 消息（"创建数据库模式成功"）
 
-    功能说明：
-    - 解析HTML内容并创建数据库模式记录
-    - 可以基于HTML表格结构生成数据库模式
-    - 支持后续扩展为实际的数据库表创建
+    执行流程：
+    1. 判断此模式是否已经存在，如果存在则结束流程
+    2. 如果不存在，连接指定的SQL引擎
+    3. 执行SQL文件中的建表语句
+    4. 执行成功后将数据插入到database_schema表中
     """
     try:
+        # 验证文件类型
+        if not sql_file.filename.endswith('.sql'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="SQL文件必须是.sql格式"
+            )
+
+        # 读取SQL文件内容
+        sql_file_content = await sql_file.read()
+        sql_file_content = sql_file_content.decode('utf-8')
+
+        # 构建请求数据
+        schema_data = SchemaCreateRequest(
+            html_content=html_content,
+            schema_name=schema_name,
+            sql_engine=sql_engine,
+            sql_file_content=sql_file_content,
+            sql_schema=sql_schema
+        )
+
         success, message, response = teacher_service.create_database_schema(
             teacher_id=current_user["id"],
             schema_data=schema_data,

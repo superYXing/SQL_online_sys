@@ -5,10 +5,10 @@ from models.base import get_db
 from schemas.admin import (
     SemesterUpdateRequest, SemesterUpdateResponse, SemesterInfo, SemesterCreateRequest,
     SemesterListResponse, TeacherCreateRequest, TeacherInfo, TeacherUpdateRequest,
-    TeacherListResponse, StudentCreateRequest, StudentInfo, StudentUpdateRequest,
-    StudentListResponse, OperationResponse, DatabaseSchemaCreateRequest,
+    TeacherListResponse, OperationResponse, DatabaseSchemaCreateRequest,
     DatabaseSchemaUpdateRequest, DatabaseSchemaInfo, DatabaseSchemaListResponse
 )
+# 已删除学生相关Schema导入: StudentCreateRequest, StudentInfo, StudentUpdateRequest, StudentListResponse
 from schemas.response import BaseResponse
 from services.admin_service import admin_service
 from services.user_management_service import user_management_service
@@ -324,217 +324,7 @@ async def delete_teacher(
             detail=f"删除教师失败: {str(e)}"
         )
 
-# 学生管理接口
-@admin_router.post("/students", response_model=StudentInfo, summary="创建学生")
-async def create_student(
-    student_data: StudentCreateRequest,
-    current_user: dict = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    创建学生
-
-    需要管理员身份的JWT认证令牌
-
-    请求参数：
-    - student_id: 学生ID（唯一）
-    - student_name: 学生姓名
-    - class_: 班级
-    - student_password: 学生密码
-
-    返回创建的学生信息
-    """
-    try:
-        success, message, student_info = user_management_service.create_student(
-            student_id=student_data.student_id,
-            student_name=student_data.student_name,
-            class_=student_data.class_,
-            student_password=student_data.student_password,
-            current_user=current_user,
-            db=db
-        )
-
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=message
-            )
-
-        return student_info
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"创建学生失败: {str(e)}"
-        )
-
-@admin_router.get("/students", response_model=StudentListResponse, summary="获取学生列表")
-async def get_students(
-    page: int = Query(1, ge=1, description="页码"),
-    limit: int = Query(20, ge=1, le=100, description="每页数量"),
-    search: Optional[str] = Query(None, description="搜索关键词（学生ID或姓名）"),
-    class_filter: Optional[str] = Query(None, description="班级过滤"),
-    current_user: dict = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    获取学生列表
-
-    需要管理员身份的JWT认证令牌
-
-    查询参数：
-    - page: 页码（默认1）
-    - limit: 每页数量（默认20，最大100）
-    - search: 搜索关键词（可选）
-    - class_filter: 班级过滤（可选）
-
-    返回学生列表和分页信息
-    """
-    try:
-        students = user_management_service.get_students(
-            page=page,
-            limit=limit,
-            search=search,
-            class_filter=class_filter,
-            current_user=current_user,
-            db=db
-        )
-
-        return students
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取学生列表失败: {str(e)}"
-        )
-
-@admin_router.get("/students/{student_id}", response_model=StudentInfo, summary="获取学生信息")
-async def get_student(
-    student_id: str,
-    current_user: dict = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    获取学生信息
-
-    需要管理员身份的JWT认证令牌
-
-    路径参数：
-    - student_id: 学生ID
-
-    返回学生的详细信息
-    """
-    try:
-        student_info = user_management_service.get_student_by_id(
-            student_id=student_id,
-            current_user=current_user,
-            db=db
-        )
-
-        if not student_info:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="学生不存在"
-            )
-
-        return student_info
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取学生信息失败: {str(e)}"
-        )
-
-@admin_router.put("/students/{student_id}", response_model=StudentInfo, summary="更新学生信息")
-async def update_student(
-    student_id: str,
-    student_data: StudentUpdateRequest,
-    current_user: dict = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    更新学生信息
-
-    需要管理员身份的JWT认证令牌
-
-    路径参数：
-    - student_id: 学生ID
-
-    请求参数：
-    - student_name: 学生姓名（可选）
-    - class_: 班级（可选）
-    - student_password: 学生密码（可选）
-
-    返回更新后的学生信息
-    """
-    try:
-        success, message, student_info = user_management_service.update_student(
-            student_id=student_id,
-            student_name=student_data.student_name,
-            class_=student_data.class_,
-            student_password=student_data.student_password,
-            current_user=current_user,
-            db=db
-        )
-
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=message
-            )
-
-        return student_info
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"更新学生信息失败: {str(e)}"
-        )
-
-@admin_router.delete("/students/{student_id}", response_model=OperationResponse, summary="删除学生")
-async def delete_student(
-    student_id: str,
-    current_user: dict = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    删除学生
-
-    需要管理员身份的JWT认证令牌
-
-    路径参数：
-    - student_id: 学生ID
-
-    注意：如果学生有关联的记录，将无法删除
-    """
-    try:
-        success, message = user_management_service.delete_student(
-            student_id=student_id,
-            current_user=current_user,
-            db=db
-        )
-
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=message
-            )
-
-        return OperationResponse(success=success, message=message)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"删除学生失败: {str(e)}"
-        )
+# 已删除: 学生管理接口 - 不再需要在admin控制器中实现
 
 # 学期管理接口
 @admin_router.post("/semesters", response_model=SemesterInfo, summary="创建学期")
@@ -687,7 +477,7 @@ async def create_database_schema(
             detail=f"创建数据库模式失败: {str(e)}"
         )
 
-@admin_router.get("/schemas", response_model=DatabaseSchemaListResponse, summary="获取数据库模式列表")
+@admin_router.get("/schemas", response_model=DatabaseSchemaListResponse, summary="获取数据库模式列表", deprecated=True)
 async def get_database_schemas(
     page: int = Query(1, ge=1, description="页码"),
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -697,6 +487,13 @@ async def get_database_schemas(
 ):
     """
     获取数据库模式列表
+
+    ⚠️ **已废弃**: 此接口已被 GET /public/schema/list 替代
+
+    新接口特点：
+    - 所有登录用户都可以访问（不再限制管理员）
+    - 返回格式为数组，包含 schema_name, schema_description, schema_author
+    - 接口路径: GET /public/schema/list
 
     需要管理员身份的JWT认证令牌
 

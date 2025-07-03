@@ -120,7 +120,6 @@ async def get_student_dashboard(
             target_student_id = current_user["id"]
         else:
             # 教师或管理员需要指定学生ID（这里暂时使用当前用户ID，实际应该从请求参数获取）
-            # TODO: 如果需要支持教师/管理员查询指定学生的数据，需要添加student_id参数
             target_student_id = current_user["id"]
 
         # 获取学生数据面板
@@ -238,55 +237,7 @@ async def get_student_answer_records(
             detail=f"获取答题记录失败: {str(e)}"
         )
 
-# @student_router.get("/answer-records", response_model=AnswerRecordsResponse, summary="获取答题记录列表")
-# async def get_answer_records(
-#     student_id: Optional[str] = Query(None, description="学生ID（可选）"),
-#     problem_id: Optional[int] = Query(None, description="题目ID（可选）"),
-#     page: int = Query(1, ge=1, description="页码"),
-#     limit: int = Query(20, ge=1, le=100, description="每页数量"),
-#     current_user: dict = Depends(get_current_user),
-#     db: Session = Depends(get_db)
-# ):
-#     """
-#     获取答题记录
-#
-#     需要登录认证（任何角色都可访问）
-#
-#     查询参数：
-#     - student_id: 学生ID（可选，如果不提供则查询所有学生）
-#     - problem_id: 题目ID（可选，如果不提供则查询所有题目）
-#     - page: 页码（默认1）
-#     - limit: 每页数量（默认20，最大100）
-#
-#     返回：
-#     - records: 答题记录列表
-#     - total: 总记录数
-#     - page: 当前页码
-#     - limit: 每页数量
-#
-#     记录按提交时间倒序排列
-#     """
-#     try:
-#         # 如果是学生角色且没有指定student_id，则只查询自己的记录
-#         if current_user.get("role") == "student" and not student_id:
-#             student_id = current_user["id"]
-#
-#         # 获取答题记录
-#         records = student_service.get_answer_records(
-#             student_id=student_id,
-#             problem_id=problem_id,
-#             page=page,
-#             limit=limit,
-#             db=db
-#         )
-#
-#         return records
-#
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"获取答题记录失败: {str(e)}"
-#         )
+# 已删除: 获取答题记录列表接口 - 功能已整合到其他接口
 
 # 题目列表接口已移至 /public 路径
 # 请使用 GET /public/problem/list 替代此接口

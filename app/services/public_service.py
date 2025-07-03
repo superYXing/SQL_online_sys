@@ -5,7 +5,7 @@ from models import Semester, DateRange, DatabaseSchema, Problem
 from schemas.public import (
     CurrentSemesterResponse, SemesterInfo, SemesterListResponse,
     SystemInfoResponse, DatabaseSchemaPublicInfo, DatabaseSchemaPublicListResponse,
-    ProblemPublicInfo, ProblemPublicListResponse
+    ProblemPublicInfo, ProblemPublicListResponse, DatabaseSchemaListItem, DatabaseSchemaListResponse
 )
 from datetime import datetime, date
 
@@ -143,6 +143,26 @@ class PublicService:
         except Exception as e:
             print(f"获取公共数据库模式列表失败: {e}")
             return DatabaseSchemaPublicListResponse(schemas=[], total=0)
+
+    def get_database_schema_list(self, db: Session) -> DatabaseSchemaListResponse:
+        """获取数据库模式列表（新格式，返回数组）"""
+        try:
+            schemas = db.query(DatabaseSchema).all()
+
+            # 构建响应数据
+            schema_list = []
+            for schema in schemas:
+                schema_list.append(DatabaseSchemaListItem(
+                    schema_name=schema.schema_name,
+                    schema_description=schema.schema_discription,  # 注意原字段名的拼写
+                    schema_author=schema.sechema_author  # 注意原字段名的拼写
+                ))
+
+            return DatabaseSchemaListResponse(root=schema_list)
+
+        except Exception as e:
+            print(f"获取数据库模式列表失败: {e}")
+            return DatabaseSchemaListResponse(root=[])
 
     def check_semester_exists(self, semester_id: int, db: Session) -> bool:
         """检查学期是否存在"""

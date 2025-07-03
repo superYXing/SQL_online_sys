@@ -133,11 +133,33 @@ class StudentCourseAddResponse(BaseModel):
 class SchemaCreateRequest(BaseModel):
     """创建数据库模式请求模型"""
     html_content: str
+    schema_name: str
+    sql_engine: str
+    sql_file_content: str  # SQL文件内容（作为字符串传递）
+    sql_schema: str
 
     class Config:
         json_schema_extra = {
             "example": {
-                "html_content": "<table><tr><th>id</th><th>name</th></tr></table>"
+                "html_content": "<html><body><h1>test</h1></body></html>",
+                "schema_name": "test",
+                "sql_engine": "postgresql",
+                "sql_file_content": """create schema test2;
+                set search_path to test2;
+
+        create table test02 (
+            id int,
+        name varchar(255)
+        );
+
+        insert into test02 values (1, '张三');
+        insert into test02 values (2, '李四');
+        insert into test02 values (3, '王五');
+        insert into test02 values (4, '赵六');
+        insert into test02 values (5, '孙七');
+        insert into test02 values (6, '周八');
+        insert into test02 values (7, '吴九');""",
+                "sql_schema": "test"
             }
         }
 
@@ -365,55 +387,8 @@ class SemesterListResponse(BaseModel):
             }
         }
 
-# 态势矩阵相关模型
-class SchemaStats(BaseModel):
-    """数据库模式统计模型"""
-    student_count: int
-    problem_count: int
-    submission_count: int
-
-    class Config:
-        from_attributes = True
-
-class SemesterMatrix(BaseModel):
-    """学期矩阵模型"""
-    semester: str
-    schemas: Dict[str, SchemaStats]
-
-    class Config:
-        from_attributes = True
-
-class DashboardMatrixResponse(BaseModel):
-    """态势矩阵响应模型"""
-    code: int = 200
-    msg: str = "查询成功"
-    matrix: List[SemesterMatrix]
-
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
-            "example": {
-                "code": 200,
-                "msg": "查询成功",
-                "matrix": [
-                    {
-                        "semester": "2025春季",
-                        "schemas": {
-                            "test": {
-                                "student_count": 50,
-                                "problem_count": 120,
-                                "submission_count": 300
-                            },
-                            "ORACLE_HR": {
-                                "student_count": 45,
-                                "problem_count": 110,
-                                "submission_count": 280
-                            }
-                        }
-                    }
-                ]
-            }
-        }
+# 已删除: 态势矩阵相关模型 - 接口已废弃
+# SchemaStats, SemesterMatrix, DashboardMatrixResponse
 
 # 学生题目提交情况相关模型
 class StudentProblemStatsRequest(BaseModel):
@@ -435,6 +410,8 @@ class StudentProblemStat(BaseModel):
     problem_id: str
     submit_count: int
     correct_count: int
+    syntax_error_count: int
+    result_error_count: int
 
     class Config:
         from_attributes = True
@@ -452,13 +429,17 @@ class StudentProblemStatsResponse(BaseModel):
                         "student_id": "20222241236",
                         "problem_id": "2",
                         "submit_count": 1,
-                        "correct_count": 1
+                        "correct_count": 1,
+                        "syntax_error_count": 0,
+                        "result_error_count": 0
                     },
                     {
                         "student_id": "20212261879",
                         "problem_id": "2",
                         "submit_count": 1,
-                        "correct_count": 1
+                        "correct_count": 1,
+                        "syntax_error_count": 0,
+                        "result_error_count": 0
                     }
                 ]
             }
@@ -575,6 +556,7 @@ class StudentProfileDocResponse(BaseModel):
     student_name: str
     class_name: str
     course_id: int
+    status: int
     correct_count: int
     submit_count: int
 
@@ -586,6 +568,7 @@ class StudentProfileDocResponse(BaseModel):
                 "student_name": "刘东",
                 "class_name": "2024级7班",
                 "course_id": 3,
+                "status": 0,
                 "correct_count": 1,
                 "submit_count": 4
             }
@@ -798,10 +781,10 @@ class DatasetExportResponse(BaseModel):
 class ProblemDetailData(BaseModel):
     """题目详情数据模型"""
     problem_id: int
-    title: str
-    problem_content: str
-    example_sql: Optional[str] = None
     is_required: int
+    is_ordered: int
+    problem_content: str
+    example_sql: str
 
     class Config:
         from_attributes = True
@@ -820,10 +803,10 @@ class ProblemDetailResponse(BaseModel):
                 "msg": "查询成功",
                 "data": {
                     "problem_id": 6,
-                    "title": "NO.6",
-                    "problem_content": "找到满足如下条件的员工：\n1. 具有超过4个直接下属并且工资高于7000的直接下属员工\n2. 员工的工资高于所在部门平均工资的1.3倍",
-                    "example_sql": "WITH a AS (\n  SELECT MANAGER_ID, count(*) cnt\n  FROM EMPLOYEES\n  WHERE SALARY >7000\n  GROUP BY MANAGER_ID\n)",
-                    "is_required": 1
+                    "is_required": 1,
+                    "is_ordered": 0,
+                    "problem_content": "资的1.3倍\n3. 查询的结果包括以下字段：\n    1. 员工姓名（firstname+空格+lastname格式形成一个资",
+                    "example_sql": "FROM EMPLOYEES e3 WHERE e3.DEPARTMENT_ID =e2.DEPARTMENT_ID "
                 }
             }
         }
@@ -831,17 +814,19 @@ class ProblemDetailResponse(BaseModel):
 class ProblemEditRequest(BaseModel):
     """题目编辑请求模型（按接口文档要求）"""
     problem_id: int
-    problem_content: Optional[str] = None
     is_required: Optional[int] = None
+    is_ordered: Optional[int] = None
+    problem_content: Optional[str] = None
     example_sql: Optional[str] = None
 
     class Config:
         json_schema_extra = {
             "example": {
                 "problem_id": 6,
-                "problem_content": "找到满足如下条件的员工：\n1. 具有超过4个直接下属且工资高于7000的直接下属员工\n2. 员工工资高于所在部门平均工资的1.3倍",
-                "example_sql": "WITH managers AS (\n  SELECT MANAGER_ID, COUNT(*) AS direct_reports\n  FROM EMPLOYEES\n  WHERE SALARY > 7000\n  GROUP BY MANAGER_ID\n)",
-                "is_required": 1
+                "is_required": 1,
+                "is_ordered": 0,
+                "problem_content": "资的1.3倍\n3. 查询的结果包括以下字段：\n    1. 员工姓名（firstname+空格+lastname格式形成一个资",
+                "example_sql": "FROM EMPLOYEES e3 WHERE e3.DEPARTMENT_ID =e2.DEPARTMENT_ID "
             }
         }
 

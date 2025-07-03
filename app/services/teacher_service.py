@@ -6,15 +6,15 @@ from models import (
     DatabaseSchema
 )
 from schemas.teacher import (
-    TeacherProfileResponse, CourseInfo, TeacherCourseListResponse,
-    StudentGradeInfo, CourseGradeResponse, StudentCreateRequest,
+    TeacherProfileResponse, StudentCreateRequest,
     StudentCreateResponse, ImportFailDetail, StudentImportResponse,
     ScoreCalculateRequest, StudentScoreInfo, ScoreUpdateResponse, ScoreListResponse,
     TeacherStudentInfo, TeacherStudentListResponse, ScoreExportRequest, ExportStudentInfo,
-    DashboardMatrixResponse, SQLQueryResponse, StudentProfileDocResponse,
-    ProblemStatisticsResponse, DatasetExportResponse, StudentCourseAddRequest, StudentCourseAddResponse,
+    SQLQueryResponse, StudentProfileDocResponse,
+    DatasetExportResponse, StudentCourseAddRequest, StudentCourseAddResponse,
     SchemaCreateRequest, SchemaCreateResponse, SQLQueryRequest, SQLQueryResponse
 )
+# 已删除无用导入: CourseInfo, TeacherCourseListResponse, StudentGradeInfo, CourseGradeResponse, ProblemStatisticsResponse, DashboardMatrixResponse
 from datetime import datetime
 import pandas as pd
 import io
@@ -49,141 +49,11 @@ class TeacherService:
             print(f"获取教师个人信息失败: {e}")
             return None
 
-    def get_teacher_courses(self, teacher_id: str, db: Session) -> TeacherCourseListResponse:
-        """获取教师的课程列表"""
-        try:
-            # 获取教师对象
-            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
-            if not teacher:
-                return TeacherCourseListResponse(courses=[], total=0)
-            
-            # 查询教师的所有课程
-            courses_query = db.query(
-                Course.course_id,
-                Course.course_name,
-                Semester.semester_name,
-                func.count(CourseSelection.student_id).label("student_count")
-            ).select_from(Course).outerjoin(
-                Semester, Semester.semester_id == Course.semester_id
-            ).outerjoin(
-                CourseSelection, CourseSelection.course_id == Course.course_id
-            ).filter(
-                Course.teacher_id == teacher.id
-            ).group_by(
-                Course.course_id, Course.course_name, Semester.semester_name
-            ).all()
-            
-            # 构建课程列表
-            course_list = []
-            for course in courses_query:
-                course_list.append(CourseInfo(
-                    course_id=course.course_id,
-                    course_name=course.course_name or "未命名课程",
-                    semester_name=course.semester_name or "未知学期",
-                    student_count=course.student_count or 0
-                ))
-            
-            return TeacherCourseListResponse(
-                courses=course_list,
-                total=len(course_list)
-            )
-            
-        except Exception as e:
-            print(f"获取教师课程列表失败: {e}")
-            return TeacherCourseListResponse(courses=[], total=0)
+    # 已删除: get_teacher_courses 方法 - 功能已整合到其他方法
 
-    def get_course_grades(self, teacher_id: str, course_id: str, db: Session) -> Optional[CourseGradeResponse]:
-        """获取课程的学生成绩"""
-        try:
-            # 验证教师是否有权限查看该课程
-            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
-            if not teacher:
-                return None
-            
-            course = db.query(Course).filter(
-                Course.course_id == course_id,
-                Course.teacher_id == teacher.id
-            ).first()
-            if not course:
-                return None
-            
-            # 获取选课学生及其成绩
-            students_query = db.query(
-                Student.student_id,
-                Student.student_name,
-                Student.class_,
-                func.count(distinct(AnswerRecord.problem_id)).label("total_problems"),
-                func.count(distinct(case((AnswerRecord.result_type == 0, AnswerRecord.problem_id)))).label("correct_problems")
-            ).select_from(CourseSelection).join(
-                Student, CourseSelection.student_id == Student.id
-            ).outerjoin(
-                AnswerRecord, AnswerRecord.student_id == Student.id
-            ).filter(
-                CourseSelection.course_id == course.course_id
-            ).group_by(
-                Student.id, Student.student_id, Student.student_name, Student.class_
-            ).all()
-            
-            # 构建学生成绩列表
-            student_grades = []
-            for student in students_query:
-                total_problems = student.total_problems or 0
-                correct_problems = student.correct_problems or 0
-                score = (correct_problems / total_problems * 100) if total_problems > 0 else 0
-                
-                student_grades.append(StudentGradeInfo(
-                    student_id=student.student_id,
-                    student_name=student.student_name or "未知",
-                    class_name=student.class_ or "未知班级",
-                    total_problems=total_problems,
-                    correct_problems=correct_problems,
-                    score=round(score, 2)
-                ))
-            
-            return CourseGradeResponse(
-                course_id=course.course_id,
-                course_name=course.course_name or "未命名课程",
-                students=student_grades,
-                total_students=len(student_grades)
-            )
-            
-        except Exception as e:
-            print(f"获取课程成绩失败: {e}")
-            return None
+    # 已删除: get_course_grades 方法 - 功能已整合到其他方法
 
-    def export_course_grades(self, teacher_id: str, course_id: str, db: Session) -> Optional[Dict]:
-        """导出课程成绩（返回可用于生成Excel的数据）"""
-        try:
-            course_grades = self.get_course_grades(teacher_id, course_id, db)
-            if not course_grades:
-                return None
-            
-            # 构建导出数据
-            export_data = {
-                "course_info": {
-                    "course_id": course_grades.course_id,
-                    "course_name": course_grades.course_name,
-                    "export_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "total_students": course_grades.total_students
-                },
-                "students": []
-            }
-            
-            for student in course_grades.students:
-                export_data["students"].append({
-                    "学号": student.student_id,
-                    "姓名": student.student_name,
-                    "班级": student.class_name,
-                    "总题目数": student.total_problems,
-                    "正确题目数": student.correct_problems,
-                    "得分": student.score
-                })
-            
-            return export_data
-            
-        except Exception as e:
-            print(f"导出课程成绩失败: {e}")
-            return None
+    # 已删除: export_course_grades 方法 - 功能已整合到其他方法
 
     def create_student(self, teacher_id: str, student_data: StudentCreateRequest,
                       db: Session) -> Tuple[bool, str, Optional[StudentCreateResponse]]:
@@ -810,98 +680,7 @@ class TeacherService:
             print(f"生成文件名失败: {e}")
             return f"成绩表-{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
-    def get_dashboard_matrix(self, year_term: Optional[str], db: Session) -> DashboardMatrixResponse:
-        """获取态势矩阵数据"""
-        try:
-            # 构建学期筛选条件
-            semester_filter = []
-            if year_term:
-                semester_filter.append(Semester.semester_name.like(f"%{year_term}%"))
-
-            # 获取符合条件的学期
-            semesters_query = db.query(Semester)
-            if semester_filter:
-                semesters_query = semesters_query.filter(*semester_filter)
-            semesters = semesters_query.all()
-
-            # 获取所有数据库模式
-            schemas = db.query(DatabaseSchema).all()
-
-            matrix_data = []
-
-            for semester in semesters:
-                semester_schemas = {}
-
-                for schema in schemas:
-                    # 1. 根据学期号找到所有课程号
-                    course_ids = db.query(Course.course_id).filter(
-                        Course.semester_id == semester.semester_id
-                    ).subquery()
-
-                    # 2. 根据课程号找到所有学生号
-                    student_ids = db.query(distinct(CourseSelection.student_id)).filter(
-                        CourseSelection.course_id.in_(
-                            db.query(course_ids.c.course_id)
-                        )
-                    ).subquery()
-
-                    # 3. 统计该学期该模式下的数据
-                    # 学生数量
-                    student_count = db.query(func.count(distinct(CourseSelection.student_id))).filter(
-                        CourseSelection.course_id.in_(
-                            db.query(Course.course_id).filter(Course.semester_id == semester.semester_id)
-                        )
-                    ).scalar() or 0
-
-                    # 题目数量（该模式下的所有题目）
-                    problem_count = db.query(func.count(Problem.problem_id)).filter(
-                        Problem.schema_id == schema.schema_id
-                    ).scalar() or 0
-
-                    # 提交数量（该学期该模式下的所有提交）
-                    submit_count = db.query(func.count(AnswerRecord.answer_id)).filter(
-                        and_(
-                            AnswerRecord.student_id.in_(
-                                db.query(CourseSelection.student_id).filter(
-                                    CourseSelection.course_id.in_(
-                                        db.query(Course.course_id).filter(Course.semester_id == semester.semester_id)
-                                    )
-                                )
-                            ),
-                            AnswerRecord.problem_id.in_(
-                                db.query(Problem.problem_id).filter(Problem.schema_id == schema.schema_id)
-                            )
-                        )
-                    ).scalar() or 0
-
-                    # 只有当有数据时才添加到矩阵中
-                    if student_count > 0 or problem_count > 0 or submit_count > 0:
-                        semester_schemas[schema.schema_name or f"schema_{schema.schema_id}"] = {
-                            "student_count": student_count,
-                            "problem_count": problem_count,
-                            "submit_count": submit_count
-                        }
-
-                # 只有当学期有数据时才添加到矩阵中
-                if semester_schemas:
-                    matrix_data.append({
-                        "semester": semester.semester_name or f"semester_{semester.semester_id}",
-                        "schemas": semester_schemas
-                    })
-
-            return DashboardMatrixResponse(
-                code=200,
-                msg="查询成功",
-                matrix=matrix_data
-            )
-
-        except Exception as e:
-            print(f"获取态势矩阵失败: {e}")
-            return DashboardMatrixResponse(
-                code=500,
-                msg=f"获取态势矩阵失败: {str(e)}",
-                matrix=[]
-            )
+    # 已删除: get_dashboard_matrix 方法 - 接口已废弃
 
     def execute_sql_query(self, teacher_id: str, query_data: SQLQueryRequest, db: Session) -> SQLQueryResponse:
         """执行SQL查询"""
@@ -1000,38 +779,59 @@ class TeacherService:
                 rows=[]
             )
 
-    def get_student_profile_doc(self, student_id: str, db: Session) -> Optional[StudentProfileDocResponse]:
+    def get_student_profile_doc(self, student_id: str, schema_id: int, db: Session) -> Optional[StudentProfileDocResponse]:
         """获取学生答题概况"""
         try:
+            # 1. 调用public接口获取当前学期号
+            from services.public_service import public_service
+            current_semester = public_service.get_current_semester(db)
+            if not current_semester:
+                return None
+
+            current_semester_id = current_semester.semester_id
+
+            # 2. 根据学期号确认课程号范围
+            courses = db.query(Course).filter(Course.semester_id == current_semester_id).all()
+            if not courses:
+                return None
+
+            # 3. 根据学号在课程号范围里确认课程号(使用.first())
             # 获取学生信息
             student = db.query(Student).filter(Student.student_id == student_id).first()
             if not student:
                 return None
 
-            # 获取当前学期
-            from services.public_service import public_service
-            current_semester = public_service.get_current_semester(db)
-            if not current_semester:
-                # 默认学期号是6，也就是2024-2025第二学期
-                current_semester_id = 6
-            else:
-                current_semester_id = current_semester.semester_id
+            # 查找学生在当前学期的选课记录
+            course_selection = db.query(CourseSelection).join(
+                Course, CourseSelection.course_id == Course.course_id
+            ).filter(
+                CourseSelection.student_id == student.id,
+                Course.semester_id == current_semester_id
+            ).first()
 
-            # 根据学期号找到所有课程号
-            courses = db.query(Course).filter(Course.semester_id == current_semester_id).all()
-            if not courses:
+            if not course_selection:
                 return None
 
-            course_id = courses[0].course_id  # 取第一个课程作为示例
+            course_id = course_selection.course_id
+            status = course_selection.status if hasattr(course_selection, 'status') else 1  # 默认为正常
 
-            # 根据课程号找到所有题目
-            problems = db.query(Problem).join(
-                Course, Course.semester_id == current_semester_id
-            ).all()
+            # 4. 根据数据库模式id得到题目id范围
+            problems = db.query(Problem).filter(Problem.schema_id == schema_id).all()
+            if not problems:
+                # 如果没有题目，返回基本信息但答题统计为0
+                return StudentProfileDocResponse(
+                    student_id=student.student_id,
+                    student_name=student.student_name or "",
+                    class_name=student.class_ or "",
+                    course_id=course_id,
+                    status=status,
+                    correct_count=0,
+                    submit_count=0
+                )
 
             problem_ids = [p.problem_id for p in problems]
 
-            # 到答题记录表里根据学号和课程的时间范围和题目的范围确认答题的正确数量和总提交数
+            # 5. 到答题记录表里根据学号和题目的范围确认答题的正确数量和总提交数
             answer_records = db.query(AnswerRecord).filter(
                 AnswerRecord.student_id == student.id,
                 AnswerRecord.problem_id.in_(problem_ids)
@@ -1046,6 +846,7 @@ class TeacherService:
                 student_name=student.student_name or "",
                 class_name=student.class_ or "",
                 course_id=course_id,
+                status=status,
                 correct_count=correct_count,
                 submit_count=submit_count
             )
@@ -1199,118 +1000,64 @@ class TeacherService:
             print(f"生成XML导出失败: {e}")
             raise
 
-    def get_problem_statistics(self, schema_id: int, db: Session) -> Optional[ProblemStatisticsResponse]:
-        """获取题目完成情况统计"""
-        try:
-            # 验证数据库模式是否存在
-            schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == schema_id).first()
-            if not schema:
-                return None
-
-            # 获取当前学期
-            from services.public_service import public_service
-            current_semester = public_service.get_current_semester(db)
-            if not current_semester:
-                return None
-
-            # 获取该模式下的所有题目
-            problems = db.query(Problem).filter(Problem.schema_id == schema_id).all()
-            if not problems:
-                return ProblemStatisticsResponse(
-                    schema_name=schema.schema_name or "",
-                    total_problems=0,
-                    problem_stats=[]
-                )
-
-            problem_ids = [p.problem_id for p in problems]
-
-            # 获取当前学期的所有学生
-            students = db.query(Student).join(
-                CourseSelection, Student.id == CourseSelection.student_id
-            ).join(
-                Course, CourseSelection.course_id == Course.course_id
-            ).filter(
-                Course.semester_id == current_semester.semester_id
-            ).distinct().all()
-
-            total_students = len(students)
-            student_ids = [s.id for s in students]
-
-            # 统计每个题目的完成情况
-            problem_stats = []
-            for problem in problems:
-                # 查询该题目的所有提交记录
-                answer_records = db.query(AnswerRecord).filter(
-                    AnswerRecord.problem_id == problem.problem_id,
-                    AnswerRecord.student_id.in_(student_ids)
-                ).all()
-
-                # 统计提交学生数（去重）
-                submitted_students = set(record.student_id for record in answer_records)
-                submit_count = len(submitted_students)
-
-                # 统计正确提交的学生数
-                correct_students = set(
-                    record.student_id for record in answer_records
-                    if record.result_type == 0
-                )
-                correct_count = len(correct_students)
-
-                # 计算完成率
-                completion_rate = (submit_count / total_students * 100) if total_students > 0 else 0
-                accuracy_rate = (correct_count / submit_count * 100) if submit_count > 0 else 0
-
-                problem_stats.append({
-                    "problem_id": problem.problem_id,
-                    "problem_content": problem.problem_content or "",
-                    "submit_count": submit_count,
-                    "correct_count": correct_count,
-                    "completion_rate": round(completion_rate, 2),
-                    "accuracy_rate": round(accuracy_rate, 2)
-                })
-
-            return ProblemStatisticsResponse(
-                schema_name=schema.schema_name or "",
-                total_problems=len(problems),
-                problem_stats=problem_stats
-            )
-
-        except Exception as e:
-            print(f"获取题目统计失败: {e}")
-            return None
+    # 已删除: get_problem_statistics 方法 - 功能已整合到其他方法
 
     def create_database_schema(self, teacher_id: str, schema_data: SchemaCreateRequest,
                               db: Session) -> Tuple[bool, str, Optional[SchemaCreateResponse]]:
-        """根据HTML格式文本创建数据库模式"""
+        """根据HTML格式文本、数据库模式名称、SQL引擎和SQL建表文件创建数据库模式"""
         try:
             # 验证教师是否存在
             teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
             if not teacher:
                 return False, "教师不存在", None
 
-            # 验证HTML内容不为空
+            # 验证必要参数
             if not schema_data.html_content or not schema_data.html_content.strip():
                 return False, "HTML内容不能为空", None
+            if not schema_data.schema_name or not schema_data.schema_name.strip():
+                return False, "数据库模式名称不能为空", None
+            if not schema_data.sql_engine or not schema_data.sql_engine.strip():
+                return False, "SQL引擎类型不能为空", None
+            if not schema_data.sql_file_content or not schema_data.sql_file_content.strip():
+                return False, "SQL文件内容不能为空", None
+            if not schema_data.sql_schema or not schema_data.sql_schema.strip():
+                return False, "SQL模式名称不能为空", None
 
-            # 解析HTML内容并创建数据库模式
-            # 这里可以添加HTML解析逻辑，提取表结构信息
-            html_content = schema_data.html_content.strip()
+            # 1. 判断此模式是否已经存在
+            existing_schema = db.query(DatabaseSchema).filter(
+                DatabaseSchema.schema_name == schema_data.schema_name
+            ).first()
+            if existing_schema:
+                return False, f"数据库模式 '{schema_data.schema_name}' 已存在", None
 
-            # 生成模式名称（可以基于时间戳或其他规则）
-            schema_name = f"schema_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            # 2. 验证SQL引擎类型
+            supported_engines = ["mysql", "postgresql", "opengauss"]
+            if schema_data.sql_engine.lower() not in supported_engines:
+                return False, f"不支持的SQL引擎类型: {schema_data.sql_engine}。支持的类型: {', '.join(supported_engines)}", None
 
-            # 创建数据库模式记录（使用现有的字段）
+            # 3. 连接指定的SQL引擎并执行SQL文件
+            from services.database_engine_service import database_engine_service
+
+            # 执行SQL文件中的建表语句
+            success, error_msg, _ = database_engine_service.execute_sql(
+                sql=schema_data.sql_file_content,
+                engine_type=schema_data.sql_engine.lower()
+            )
+
+            if not success:
+                return False, f"执行SQL文件失败: {error_msg}", None
+
+            # 4. 执行成功后将数据插入到database_schema表中
             new_schema = DatabaseSchema(
-                schema_name=schema_name,
-                schema_discription=f"基于HTML创建的数据库模式: {html_content[:100]}..."  # 使用现有字段名
+                schema_name=schema_data.schema_name,
+                schema_discription=schema_data.html_content,  # 使用HTML内容作为描述
+                sql_schema=schema_data.sql_schema,  # 保存SQL模式名称
+                sechema_author=teacher.teacher_name or teacher.teacher_id  # 设置作者
             )
 
             db.add(new_schema)
             db.commit()
             db.refresh(new_schema)
-
-            # TODO: 这里可以添加实际的数据库模式创建逻辑
-            # 例如：解析HTML表格结构，生成CREATE TABLE语句，在目标数据库中执行
 
             response = SchemaCreateResponse(
                 code=200,

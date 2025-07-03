@@ -2,10 +2,11 @@ from typing import Optional, Tuple, List
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from fastapi import HTTPException, status
-from models import Student, Teacher
+from models import Teacher
 from schemas.admin import (
-    StudentInfo, StudentListResponse, TeacherInfo, TeacherListResponse
+    TeacherInfo, TeacherListResponse
 )
+# 已删除学生相关导入: Student, StudentInfo, StudentListResponse
 
 class UserManagementService:
     """用户管理服务类"""
@@ -18,174 +19,8 @@ class UserManagementService:
                 detail="需要管理员权限才能执行此操作"
             )
     
-    # 学生管理方法
-    def create_student(self, student_id: str, student_name: str, class_: str,
-                      student_password: str, current_user: dict, db: Session) -> Tuple[bool, str, Optional[StudentInfo]]:
-        """创建学生"""
-         
-
-        try:
-            # 检查学生ID是否已存在
-            existing_student = db.query(Student).filter(Student.student_id == student_id).first()
-            if existing_student:
-                return False, "学生ID已存在", None
-            
-            # 创建新学生
-            new_student = Student(
-                student_id=student_id,
-                student_name=student_name,
-                class_=class_,
-                student_password=student_password
-            )
-            
-            db.add(new_student)
-            db.commit()
-            db.refresh(new_student)
-            
-            student_info = StudentInfo(
-                id=new_student.id,
-                student_id=new_student.student_id,
-                student_name=new_student.student_name,
-                class_=new_student.class_
-            )
-            
-            return True, "学生创建成功", student_info
-            
-        except Exception as e:
-            db.rollback()
-            print(f"创建学生失败: {e}")
-            return False, f"创建失败: {str(e)}", None
-
-    def get_students(self, page: int = 1, limit: int = 20, search: Optional[str] = None,
-                    class_filter: Optional[str] = None, current_user: dict = None, db: Session = None) -> StudentListResponse:
-        """获取学生列表"""
-        
-
-        try:
-            query = db.query(Student)
-            
-            # 搜索功能
-            if search:
-                query = query.filter(
-                    or_(
-                        Student.student_id.contains(search),
-                        Student.student_name.contains(search)
-                    )
-                )
-            
-            # 班级过滤
-            if class_filter:
-                query = query.filter(Student.class_.contains(class_filter))
-            
-            # 获取总数
-            total = query.count()
-            
-            # 分页查询
-            offset = (page - 1) * limit
-            students = query.offset(offset).limit(limit).all()
-            
-            # 构建响应数据
-            student_list = []
-            for student in students:
-                student_list.append(StudentInfo(
-                    id=student.id,
-                    student_id=student.student_id,
-                    student_name=student.student_name,
-                    class_=student.class_
-                ))
-            
-            return StudentListResponse(
-                students=student_list,
-                total=total,
-                page=page,
-                limit=limit
-            )
-            
-        except Exception as e:
-            print(f"获取学生列表失败: {e}")
-            return StudentListResponse(students=[], total=0, page=page, limit=limit)
-
-    def get_student_by_id(self, student_id: str, current_user: dict, db: Session) -> Optional[StudentInfo]:
-        """根据ID获取学生信息"""
-         
-
-        try:
-            student = db.query(Student).filter(Student.student_id == student_id).first()
-            if not student:
-                return None
-            
-            return StudentInfo(
-                id=student.id,
-                student_id=student.student_id,
-                student_name=student.student_name,
-                class_=student.class_
-            )
-            
-        except Exception as e:
-            print(f"获取学生信息失败: {e}")
-            return None
-
-    def update_student(self, student_id: str, student_name: Optional[str] = None,
-                      class_: Optional[str] = None, student_password: Optional[str] = None,
-                      current_user: dict = None, db: Session = None) -> Tuple[bool, str, Optional[StudentInfo]]:
-        """更新学生信息"""
-         
-
-        try:
-            student = db.query(Student).filter(Student.student_id == student_id).first()
-            if not student:
-                return False, "学生不存在", None
-            
-            # 更新字段
-            if student_name is not None:
-                student.student_name = student_name
-            if class_ is not None:
-                student.class_ = class_
-            if student_password is not None:
-                student.student_password = student_password
-            
-            db.commit()
-            db.refresh(student)
-            
-            student_info = StudentInfo(
-                id=student.id,
-                student_id=student.student_id,
-                student_name=student.student_name,
-                class_=student.class_
-            )
-            
-            return True, "学生信息更新成功", student_info
-            
-        except Exception as e:
-            db.rollback()
-            print(f"更新学生信息失败: {e}")
-            return False, f"更新失败: {str(e)}", None
-
-    def delete_student(self, student_id: str, current_user: dict, db: Session) -> Tuple[bool, str]:
-        """删除学生"""
-         
-
-        try:
-            student = db.query(Student).filter(Student.student_id == student_id).first()
-            if not student:
-                return False, "学生不存在"
-            
-            # 检查是否有关联的答题记录或选课记录
-            # 注意：这里需要根据实际的关系来检查
-            if hasattr(student, 'answer_records') and student.answer_records:
-                return False, "该学生有关联的答题记录，无法删除"
-            if hasattr(student, 'course_selections') and student.course_selections:
-                return False, "该学生有关联的选课记录，无法删除"
-            
-            db.delete(student)
-            db.commit()
-            
-            return True, "学生删除成功"
-            
-        except Exception as e:
-            db.rollback()
-            print(f"删除学生失败: {e}")
-            return False, f"删除失败: {str(e)}"
+    # 已删除: 学生管理方法 - 不再需要在admin服务中实现
+    # create_student, get_students, get_student_by_id, update_student, delete_student
 
     # 教师管理方法
     def create_teacher(self, teacher_id: str, teacher_name: str, teacher_password: str,

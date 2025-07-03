@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 from typing import List, Optional
 from datetime import datetime, date
 
@@ -79,6 +79,43 @@ class DatabaseSchemaPublicListResponse(BaseModel):
     """公共数据库模式列表响应模型"""
     schemas: List[DatabaseSchemaPublicInfo]
     total: int
-    
+
     class Config:
         from_attributes = True
+
+class DatabaseSchemaListItem(BaseModel):
+    """数据库模式列表项模型（新格式）"""
+    schema_name: Optional[str]
+    schema_description: Optional[str]
+    schema_author: Optional[str]
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "schema_name": "ORACLE_HR",
+                "schema_description": "html_description",
+                "schema_author": "name"
+            }
+        }
+
+class DatabaseSchemaListResponse(RootModel):
+    """数据库模式列表响应模型（新格式）"""
+    root: List[DatabaseSchemaListItem]
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": [
+                {
+                    "schema_name": "ORACLE_HR",
+                    "schema_description": "html_description",
+                    "schema_author": "name"
+                },
+                {
+                    "schema_name": "ORACLE_SH",
+                    "schema_description": "html_description",
+                    "schema_author": "name"
+                }
+            ]
+        }

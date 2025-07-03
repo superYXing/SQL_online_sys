@@ -306,54 +306,7 @@ class StudentService:
             print(f"提交答案失败: {e}")
             return -1, f"提交失败: {str(e)}", None
 
-    # def get_answer_records(self, student_id: Optional[str] = None, problem_id: Optional[int] = None,
-    #                       page: int = 1, limit: int = 20, db: Session = None) -> AnswerRecordsResponse:
-    #     """获取答题记录"""
-    #     try:
-    #         # 构建基础查询
-    #         query = db.query(AnswerRecord)
-    #
-    #         # 如果指定了学生ID，添加学生过滤条件
-    #         if student_id:
-    #             student = db.query(Student).filter(Student.student_id == student_id).first()
-    #             if student:
-    #                 query = query.filter(AnswerRecord.student_id == student.id)
-    #             else:
-    #                 # 学生不存在，返回空结果
-    #                 return AnswerRecordsResponse(records=[], total=0, page=page, limit=limit)
-    #
-    #         # 如果指定了题目ID，添加题目过滤条件
-    #         if problem_id:
-    #             query = query.filter(AnswerRecord.problem_id == problem_id)
-    #
-    #         # 获取总数
-    #         total = query.count()
-    #
-    #         # 分页查询
-    #         offset = (page - 1) * limit
-    #         records = query.order_by(AnswerRecord.timestep.desc()).offset(offset).limit(limit).all()
-    #
-    #         # 构建响应数据
-    #         record_items = []
-    #         for record in records:
-    #             record_items.append(AnswerRecordItem(
-    #                 answer_id=record.id,
-    #                 problem_id=record.problem_id,
-    #                 answer_content=record.answer_content,
-    #                 result_type=record.result_type,  # 使用result_type字段
-    #                 submit_time=record.timestep
-    #             ))
-    #
-    #         return AnswerRecordsResponse(
-    #             records=record_items,
-    #             total=total,
-    #             page=page,
-    #             limit=limit
-    #         )
-    #
-    #     except Exception as e:
-    #         print(f"获取答题记录失败: {e}")
-    #         return AnswerRecordsResponse(records=[], total=0, page=page, limit=limit)
+    # 已删除: get_answer_records 方法 - 功能已整合到其他方法
 
     def get_problem_list(self, schema_id: Optional[int] = None, db: Session = None) -> ProblemListResponse:
         """获取题目列表"""
