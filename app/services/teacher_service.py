@@ -12,12 +12,14 @@ from schemas.teacher import (
     ScoreCalculateRequest, StudentScoreInfo, ScoreUpdateResponse, ScoreListResponse,
     TeacherStudentInfo, TeacherStudentListResponse, ScoreExportRequest, ExportStudentInfo,
     DashboardMatrixResponse, SQLQueryResponse, StudentProfileDocResponse,
-    ProblemStatisticsResponse, DatasetExportResponse
+    ProblemStatisticsResponse, DatasetExportResponse, StudentCourseAddRequest, StudentCourseAddResponse,
+    SchemaCreateRequest, SchemaCreateResponse, SQLQueryRequest, SQLQueryResponse
 )
 from datetime import datetime
 import pandas as pd
 import io
 import json
+from services.public_service import public_service
 
 class TeacherService:
     """教师服务类"""
@@ -111,7 +113,7 @@ class TeacherService:
                 Student.student_name,
                 Student.class_,
                 func.count(distinct(AnswerRecord.problem_id)).label("total_problems"),
-                func.count(distinct(case((AnswerRecord.is_correct == 1, AnswerRecord.problem_id)))).label("correct_problems")
+                func.count(distinct(case((AnswerRecord.result_type == 0, AnswerRecord.problem_id)))).label("correct_problems")
             ).select_from(CourseSelection).join(
                 Student, CourseSelection.student_id == Student.id
             ).outerjoin(
@@ -225,6 +227,88 @@ class TeacherService:
             db.rollback()
             print(f"创建学生失败: {e}")
             return False, f"创建失败: {str(e)}", None
+
+    def add_student_course(self, teacher_id: str, course_data: StudentCourseAddRequest,
+                          db: Session) -> Tuple[bool, str, Optional[StudentCourseAddResponse]]:
+        """添加学生选课信息"""
+        try:
+            # 验证教师是否存在
+            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
+            if not teacher:
+                return False, "教师不存在", None
+
+            # 验证课程是否存在
+            course = db.query(Course).filter(Course.course_id == course_data.course_id).first()
+            if not course:
+                return False, f"课程ID {course_data.course_id} 不存在", None
+
+            # 获取当前学期ID
+            current_semester = public_service.get_current_semester(db)
+            if not current_semester:
+                return False, "无法获取当前学期信息", None
+
+            # 检查学生是否已存在
+            existing_student = db.query(Student).filter(
+                Student.student_id == course_data.student_id
+            ).first()
+
+            if existing_student:
+                # 学生已存在，检查是否已经选择了该课程
+                existing_selection = db.query(CourseSelection).filter(
+                    CourseSelection.student_id == existing_student.id,
+                    CourseSelection.course_id == course_data.course_id,
+                    CourseSelection.semester_id == current_semester.semester_id
+                ).first()
+
+                if existing_selection:
+                    return False, f"学生 {course_data.student_id} 已经选择了课程 {course_data.course_id}", None
+
+                # 创建选课记录
+                new_selection = CourseSelection(
+                    student_id=existing_student.id,
+                    course_id=course_data.course_id,
+                    status=course_data.status,
+                    semester_id=current_semester.semester_id,
+                    score=0  # 默认分数为0
+                )
+
+                db.add(new_selection)
+                db.commit()
+
+                response = StudentCourseAddResponse(code=200, msg="添加")
+                return True, "学生选课信息添加成功", response
+
+            else:
+                # 学生不存在，先创建学生
+                new_student = Student(
+                    student_id=course_data.student_id,
+                    student_name=course_data.student_name,
+                    class_=course_data.class_,
+                    student_password="default@password"  # 默认密码
+                )
+
+                db.add(new_student)
+                db.flush()  # 获取新学生的ID
+
+                # 创建选课记录
+                new_selection = CourseSelection(
+                    student_id=new_student.id,
+                    course_id=course_data.course_id,
+                    status=course_data.status,
+                    semester_id=current_semester.semester_id,
+                    score=0  # 默认分数为0
+                )
+
+                db.add(new_selection)
+                db.commit()
+
+                response = StudentCourseAddResponse(code=200, msg="添加")
+                return True, "学生创建并选课成功", response
+
+        except Exception as e:
+            db.rollback()
+            print(f"添加学生选课信息失败: {e}")
+            return False, f"添加失败: {str(e)}", None
 
     def import_students_from_excel(self, teacher_id: str, file_content: bytes,
                                   db: Session) -> StudentImportResponse:
@@ -389,11 +473,11 @@ class TeacherService:
 
                 # 计算每个学生的分数
                 for course_selection, student_id, student_name, student_class in course_selections:
-                    # 查询学生在指定题目上的正确答题数
+                    # 查询学生在指定题目上的正确答题数（result_type == 0表示正确）
                     correct_count = db.query(func.count(distinct(AnswerRecord.problem_id))).filter(
                         AnswerRecord.student_id == course_selection.student_id,
                         AnswerRecord.problem_id.in_(problem_ids),
-                        AnswerRecord.is_correct == 1
+                        AnswerRecord.result_type == 0
                     ).scalar() or 0
 
                     # 每道题10分
@@ -819,47 +903,101 @@ class TeacherService:
                 matrix=[]
             )
 
-    def execute_sql_query(self, sql: str, schema_id: int, db: Session) -> SQLQueryResponse:
+    def execute_sql_query(self, teacher_id: str, query_data: SQLQueryRequest, db: Session) -> SQLQueryResponse:
         """执行SQL查询"""
         try:
-            # 验证数据库模式是否存在
-            schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == schema_id).first()
-            if not schema:
+            # 验证教师是否存在
+            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
+            if not teacher:
                 return SQLQueryResponse(
-                    success=False,
-                    data=[],
+                    code=400,
+                    msg="教师不存在",
                     columns=[],
-                    row_count=0,
-                    error_message="数据库模式不存在"
+                    rows=[]
                 )
 
-            # TODO: 实际的SQL执行逻辑
-            # 这里应该根据schema_id连接到对应的数据库并执行SQL
-            # 为了安全考虑，应该对SQL进行验证和过滤
+            # 验证数据库模式是否存在
+            schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == query_data.schema_id).first()
+            if not schema:
+                return SQLQueryResponse(
+                    code=400,
+                    msg="数据库模式不存在",
+                    columns=[],
+                    rows=[]
+                )
 
-            # 模拟查询结果
-            mock_data = [
-                {"id": 1, "name": "张三", "department": "技术部"},
-                {"id": 2, "name": "李四", "department": "市场部"}
-            ]
-            mock_columns = ["id", "name", "department"]
+            # 使用database_engine_service执行SQL查询，默认使用PostgreSQL
+            from services.database_engine_service import database_engine_service
 
-            return SQLQueryResponse(
-                success=True,
-                data=mock_data,
-                columns=mock_columns,
-                row_count=len(mock_data),
-                error_message=None
+            # 构建完整的SQL语句，包含数据库切换语句
+            if schema.sql_schema:
+                # 根据引擎类型选择切换语句（默认使用PostgreSQL）
+                engine_type = "postgresql"
+                if engine_type == "mysql":
+                    switch_sql = f"USE {schema.sql_schema};"
+                elif engine_type in ["postgresql", "opengauss"]:
+                    switch_sql = f"SET search_path TO {schema.sql_schema};"
+                else:
+                    switch_sql = f"SET search_path TO {schema.sql_schema};"  # 默认使用PostgreSQL语法
+                # 输出切换语句
+                print(f"执行切换语句: {switch_sql}")
+                # 执行切换语句
+                switch_success, switch_message, _ = database_engine_service.execute_sql(
+                    sql=switch_sql,
+                    engine_type=engine_type
+                )
+
+                if not switch_success:
+                    print(f"执行数据库切换失败: {switch_message}")
+                    # 继续执行用户SQL，不因切换失败而中断
+
+            # 执行用户的SQL查询
+            success, message, result_data = database_engine_service.execute_sql(
+                sql=query_data.sql,
+                engine_type="postgresql"
             )
+
+            if not success:
+                return SQLQueryResponse(
+                    code=400,
+                    msg=f"SQL执行失败: {message}",
+                    columns=[],
+                    rows=[]
+                )
+
+            # 处理查询结果
+            if result_data and len(result_data) > 0:
+                # 获取列名
+                columns = list(result_data[0].keys()) if result_data else []
+
+                # 将字典列表转换为二维数组
+                rows = []
+                for row_dict in result_data:
+                    row = [row_dict.get(col) for col in columns]
+                    rows.append(row)
+
+                return SQLQueryResponse(
+                    code=200,
+                    msg="查询成功",
+                    columns=columns,
+                    rows=rows
+                )
+            else:
+                # 空结果集
+                return SQLQueryResponse(
+                    code=200,
+                    msg="查询成功",
+                    columns=[],
+                    rows=[]
+                )
 
         except Exception as e:
             print(f"执行SQL查询失败: {e}")
             return SQLQueryResponse(
-                success=False,
-                data=[],
+                code=500,
+                msg=f"查询执行失败: {str(e)}",
                 columns=[],
-                row_count=0,
-                error_message=f"查询执行失败: {str(e)}"
+                rows=[]
             )
 
     def get_student_profile_doc(self, student_id: str, db: Session) -> Optional[StudentProfileDocResponse]:
@@ -901,7 +1039,7 @@ class TeacherService:
 
             # 计算正确数量和总提交数
             submit_count = len(answer_records)
-            correct_count = sum(1 for record in answer_records if record.is_correct)
+            correct_count = sum(1 for record in answer_records if record.result_type == 0)
 
             return StudentProfileDocResponse(
                 student_id=student.student_id,
@@ -958,7 +1096,7 @@ class TeacherService:
                 if answer_records:  # 只导出有提交记录的学生
                     # 计算统计数据
                     submit_count = len(answer_records)
-                    correct_count = sum(1 for record in answer_records if record.is_correct)
+                    correct_count = sum(1 for record in answer_records if record.result_type == 0)
 
                     # 计算完成题目总数（去重）
                     completed_problem_ids = set(record.problem_id for record in answer_records)
@@ -1114,7 +1252,7 @@ class TeacherService:
                 # 统计正确提交的学生数
                 correct_students = set(
                     record.student_id for record in answer_records
-                    if record.is_correct
+                    if record.result_type == 0
                 )
                 correct_count = len(correct_students)
 
@@ -1140,6 +1278,51 @@ class TeacherService:
         except Exception as e:
             print(f"获取题目统计失败: {e}")
             return None
+
+    def create_database_schema(self, teacher_id: str, schema_data: SchemaCreateRequest,
+                              db: Session) -> Tuple[bool, str, Optional[SchemaCreateResponse]]:
+        """根据HTML格式文本创建数据库模式"""
+        try:
+            # 验证教师是否存在
+            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
+            if not teacher:
+                return False, "教师不存在", None
+
+            # 验证HTML内容不为空
+            if not schema_data.html_content or not schema_data.html_content.strip():
+                return False, "HTML内容不能为空", None
+
+            # 解析HTML内容并创建数据库模式
+            # 这里可以添加HTML解析逻辑，提取表结构信息
+            html_content = schema_data.html_content.strip()
+
+            # 生成模式名称（可以基于时间戳或其他规则）
+            schema_name = f"schema_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+            # 创建数据库模式记录（使用现有的字段）
+            new_schema = DatabaseSchema(
+                schema_name=schema_name,
+                schema_discription=f"基于HTML创建的数据库模式: {html_content[:100]}..."  # 使用现有字段名
+            )
+
+            db.add(new_schema)
+            db.commit()
+            db.refresh(new_schema)
+
+            # TODO: 这里可以添加实际的数据库模式创建逻辑
+            # 例如：解析HTML表格结构，生成CREATE TABLE语句，在目标数据库中执行
+
+            response = SchemaCreateResponse(
+                code=200,
+                msg="创建数据库模式成功"
+            )
+
+            return True, "创建数据库模式成功", response
+
+        except Exception as e:
+            db.rollback()
+            print(f"创建数据库模式失败: {e}")
+            return False, f"创建失败: {str(e)}", None
 
 # 全局教师服务实例
 teacher_service = TeacherService()

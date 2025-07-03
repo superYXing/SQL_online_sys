@@ -95,6 +95,100 @@ class StudentCreateResponse(BaseModel):
             }
         }
 
+# 学生选课相关模型
+class StudentCourseAddRequest(BaseModel):
+    """添加学生选课信息请求模型"""
+    student_id: str
+    student_name: str
+    class_: str
+    status: int  # 0为重修，1为正常
+    course_id: int
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "student_id": "20232251177",
+                "student_name": "张三",
+                "class_": "计算机科学与技术1班",
+                "status": 1,
+                "course_id": 10
+            }
+        }
+
+class StudentCourseAddResponse(BaseModel):
+    """添加学生选课信息响应模型"""
+    code: int = 200
+    msg: str = "查询成功"
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "code": 200,
+                "msg": "查询成功"
+            }
+        }
+
+# 数据库模式相关模型
+class SchemaCreateRequest(BaseModel):
+    """创建数据库模式请求模型"""
+    html_content: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "html_content": "<table><tr><th>id</th><th>name</th></tr></table>"
+            }
+        }
+
+class SchemaCreateResponse(BaseModel):
+    """创建数据库模式响应模型"""
+    code: int = 200
+    msg: str = "创建数据库模式成功"
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "code": 200,
+                "msg": "创建数据库模式成功"
+            }
+        }
+
+class SQLQueryRequest(BaseModel):
+    """SQL查询请求模型"""
+    schema_id: int
+    sql: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "schema_id": 4,
+                "sql": "SELECT * FROM test"
+            }
+        }
+
+class SQLQueryResponse(BaseModel):
+    """SQL查询响应模型"""
+    code: int = 200
+    msg: str = "查询成功"
+    columns: List[str] = []
+    rows: List[List] = []
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "code": 200,
+                "msg": "查询成功",
+                "columns": ["EMPLOYEE_ID", "FIRST_NAME", "LAST_NAME", "EMAIL", "PHONE_NUMBER", "HIRE_DATE", "JOB_ID", "SALARY", "COMMISSION_PCT", "MANAGER_ID", "DEPARTMENT_ID"],
+                "rows": [
+                    [100, "Steven", "King", "SKING", "515.123.4567", "2003-06-17 00:00:00", "AD_PRES", 24000, None, None, 90],
+                    [101, "Neena", "Kochhar", "NKOCHHAR", "515.123.4568", "2005-09-21 00:00:00", "AD_VP", 17000, None, 100, 90]
+                ]
+            }
+        }
+
 class ImportFailDetail(BaseModel):
     """导入失败详情模型"""
     row: int
@@ -237,42 +331,7 @@ class TeacherSchemaListResponse(BaseModel):
             ]
         }
 
-# SQL查询相关模型
-class SQLQueryRequest(BaseModel):
-    """SQL查询请求模型"""
-    sql: str
-    schema_id: int
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "sql": "SELECT * FROM employees LIMIT 10",
-                "schema_id": 1
-            }
-        }
-
-class SQLQueryResponse(BaseModel):
-    """SQL查询响应模型"""
-    success: bool
-    data: Optional[List[Dict]] = None
-    columns: Optional[List[str]] = None
-    row_count: int = 0
-    error_message: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
-            "example": {
-                "success": True,
-                "data": [
-                    {"id": 1, "name": "张三", "department": "技术部"},
-                    {"id": 2, "name": "李四", "department": "市场部"}
-                ],
-                "columns": ["id", "name", "department"],
-                "row_count": 2,
-                "error_message": None
-            }
-        }
+# SQL查询相关模型已在上方定义，避免重复
 
 # 学期相关模型
 class SemesterItem(BaseModel):
@@ -410,7 +469,7 @@ class SubmissionRecord(BaseModel):
     """提交记录模型"""
     submission_time: str
     sql_content: str
-    is_correct: bool
+    result_type: int  # 0:正确  1：语法错误  2：结果错误
     error_message: Optional[str] = None
 
     class Config:

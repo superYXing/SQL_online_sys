@@ -51,7 +51,7 @@ class AIService:
                 problem=problem,
                 schema=schema,
                 answer_content=answer_content,
-                is_correct=latest_answer.is_correct if latest_answer else False
+                is_correct=(latest_answer.result_type == 0) if latest_answer else False
             )
             
             # 调用AI API

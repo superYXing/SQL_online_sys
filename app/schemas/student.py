@@ -93,7 +93,7 @@ class AnswerSubmitRequest(BaseModel):
 
 class AnswerSubmitResponse(BaseModel):
     """答题提交响应模型"""
-    is_correct: bool
+    result_type: int
     message: str
     answer_id: int
 
@@ -101,7 +101,7 @@ class AnswerSubmitResponse(BaseModel):
         from_attributes = True
         json_schema_extra = {
             "example": {
-                "is_correct": True,
+                "result_type": 0,
                 "message": "结果正确",
                 "answer_id": 123
             }
@@ -112,7 +112,7 @@ class AnswerRecordItem(BaseModel):
     answer_id: int
     problem_id: int
     answer_content: str
-    is_correct: int
+    result_type: int  # 0:正确  1：语法错误  2：结果错误
     submit_time: datetime
 
     class Config:
@@ -127,6 +127,45 @@ class AnswerRecordsResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class StudentAnswerRecord(BaseModel):
+    """学生答题记录模型"""
+    answer_record_id: int
+    result_type: int  # 0:正确  1：语法错误  2：结果错误
+    answer_content: str
+    timestep: datetime
+
+    class Config:
+        from_attributes = True
+
+class StudentAnswerRecordsResponse(BaseModel):
+    """学生答题记录响应模型"""
+    student_id: int
+    problem_id: int
+    records: List[StudentAnswerRecord]
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "student_id": 1001,
+                "problem_id": 5,
+                "records": [
+                    {
+                        "answer_record_id": 123,
+                        "result_type": 1,
+                        "answer_content": "SELECT * FROM employees;",
+                        "timestep": "2025-01-01 08:30:00"
+                    },
+                    {
+                        "answer_record_id": 124,
+                        "result_type": 0,
+                        "answer_content": "SELECT * FROM employees;",
+                        "timestep": "2025-01-01 08:30:00"
+                    }
+                ]
+            }
+        }
 
 class ProblemItem(BaseModel):
     """题目项模型"""

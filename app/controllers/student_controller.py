@@ -6,7 +6,8 @@ import schemas.student
 from schemas.student import (
     StudentProfileResponse, StudentRankItem, AnswerSubmitRequest,
     AnswerSubmitResponse, AnswerRecordsResponse, ProblemListResponse,
-    DatabaseSchemaListResponse, AIAnalyzeRequest, AIAnalyzeResponse
+    DatabaseSchemaListResponse, AIAnalyzeRequest, AIAnalyzeResponse,
+    StudentAnswerRecordsResponse
 )
 from schemas.response import BaseResponse
 from services.student_service import student_service
@@ -162,7 +163,7 @@ async def submit_answer(
     """
     try:
         # 提交答案
-        is_correct, message, answer_id = student_service.submit_answer(
+        result_type, message, answer_id = student_service.submit_answer(
             student_id=current_user["id"],
             problem_id=answer_data.problem_id,
             answer_content=answer_data.answer_content,
@@ -170,14 +171,14 @@ async def submit_answer(
             engine_type=answer_data.engine_type or "mysql"
         )
 
-        if answer_id is None:
+        if answer_id is None or result_type == -1:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=message
             )
 
         return AnswerSubmitResponse(
-            is_correct=is_correct,
+            result_type=result_type,
             message=message,
             answer_id=answer_id
         )
@@ -190,55 +191,102 @@ async def submit_answer(
             detail=f"提交答案失败: {str(e)}"
         )
 
-@student_router.get("/answers", response_model=AnswerRecordsResponse, summary="获取答题记录")
-async def get_answer_records(
-    student_id: Optional[str] = Query(None, description="学生ID（可选）"),
-    problem_id: Optional[int] = Query(None, description="题目ID（可选）"),
-    page: int = Query(1, ge=1, description="页码"),
-    limit: int = Query(20, ge=1, le=100, description="每页数量"),
-    current_user: dict = Depends(get_current_user),
+@student_router.get("/answers", response_model=StudentAnswerRecordsResponse, summary="查询学生答题记录")
+async def get_student_answer_records(
+    problem_id: int,
+    current_user: dict = Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
     """
-    获取答题记录
+    根据题目ID查询当前学生提交的答题记录
 
-    需要登录认证（任何角色都可访问）
+    需要学生身份的JWT认证令牌
 
-    查询参数：
-    - student_id: 学生ID（可选，如果不提供则查询所有学生）
-    - problem_id: 题目ID（可选，如果不提供则查询所有题目）
-    - page: 页码（默认1）
-    - limit: 每页数量（默认20，最大100）
+    参数：
+    - problem_id: 题目ID
 
-    返回：
-    - records: 答题记录列表
-    - total: 总记录数
-    - page: 当前页码
-    - limit: 每页数量
-
-    记录按提交时间倒序排列
+    返回当前学生对该题目的所有答题记录：
+    - student_id: 学生ID
+    - problem_id: 题目ID
+    - records: 答题记录列表（按提交时间倒序排列）
+      - answer_record_id: 答题记录ID
+      - result_type: 结果类型（0:正确 1:语法错误 2:结果错误）
+      - answer_content: 答题内容
+      - timestep: 提交时间
     """
     try:
-        # 如果是学生角色且没有指定student_id，则只查询自己的记录
-        if current_user.get("role") == "student" and not student_id:
-            student_id = current_user["id"]
-
-        # 获取答题记录
-        records = student_service.get_answer_records(
-            student_id=student_id,
+        # 获取学生答题记录
+        records = student_service.get_student_answer_records(
+            student_id=current_user["id"],
             problem_id=problem_id,
-            page=page,
-            limit=limit,
             db=db
         )
 
+        if not records:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="未找到答题记录"
+            )
+
         return records
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取答题记录失败: {str(e)}"
         )
+
+# @student_router.get("/answer-records", response_model=AnswerRecordsResponse, summary="获取答题记录列表")
+# async def get_answer_records(
+#     student_id: Optional[str] = Query(None, description="学生ID（可选）"),
+#     problem_id: Optional[int] = Query(None, description="题目ID（可选）"),
+#     page: int = Query(1, ge=1, description="页码"),
+#     limit: int = Query(20, ge=1, le=100, description="每页数量"),
+#     current_user: dict = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """
+#     获取答题记录
+#
+#     需要登录认证（任何角色都可访问）
+#
+#     查询参数：
+#     - student_id: 学生ID（可选，如果不提供则查询所有学生）
+#     - problem_id: 题目ID（可选，如果不提供则查询所有题目）
+#     - page: 页码（默认1）
+#     - limit: 每页数量（默认20，最大100）
+#
+#     返回：
+#     - records: 答题记录列表
+#     - total: 总记录数
+#     - page: 当前页码
+#     - limit: 每页数量
+#
+#     记录按提交时间倒序排列
+#     """
+#     try:
+#         # 如果是学生角色且没有指定student_id，则只查询自己的记录
+#         if current_user.get("role") == "student" and not student_id:
+#             student_id = current_user["id"]
+#
+#         # 获取答题记录
+#         records = student_service.get_answer_records(
+#             student_id=student_id,
+#             problem_id=problem_id,
+#             page=page,
+#             limit=limit,
+#             db=db
+#         )
+#
+#         return records
+#
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=f"获取答题记录失败: {str(e)}"
+#         )
 
 # 题目列表接口已移至 /public 路径
 # 请使用 GET /public/problem/list 替代此接口
