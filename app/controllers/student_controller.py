@@ -39,13 +39,8 @@ async def get_student_profile(
             student_id=current_user["id"],
             db=db
         )
-        
-        if not student_info:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="未找到学生信息或学生未选课"
-            )
-        
+
+        # 服务层已经处理了空数据情况，直接返回结果
         return student_info
         
     except HTTPException:
@@ -62,16 +57,24 @@ async def get_student_rank(
     db: Session = Depends(get_db)
 ):
     """
-    获取所有学生的题目完成数与方法数排名
-    
-    需要登录认证（任何角色都可访问）
-    
+    获取学生的题目完成数与方法数排名前十名
+
+    需要登录认证（所有角色都可访问）
+
+    传入参数：无
+
     返回前10名学生的排名信息：
-    - 名次
-    - 姓名（包含班级信息）
-    - 题目数（答对的题目数量）
-    - 方法数（不同答案的数量）
-    
+    - 名次: 排名位次
+    - 姓名: 学生姓名（格式：班级 姓名）
+    - 题目数: 答对的题目数量
+    - 方法数: 不同答案的数量
+
+    流程：
+    1. 调用public接口获取当前学期号
+    2. 根据学期号确认课程号范围
+    3. 在选课表里根据课程号范围来确定学生名单
+    4. 用这些学生进行排序
+
     排序规则：
     1. 按答对题目数降序
     2. 按方法数降序

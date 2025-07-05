@@ -5,7 +5,8 @@ from models import Semester, DateRange, DatabaseSchema, Problem
 from schemas.public import (
     CurrentSemesterResponse, SemesterInfo, SemesterListResponse,
     SystemInfoResponse, DatabaseSchemaPublicInfo, DatabaseSchemaPublicListResponse,
-    ProblemPublicInfo, ProblemPublicListResponse, DatabaseSchemaListItem, DatabaseSchemaListResponse
+    ProblemPublicInfo, ProblemPublicListResponse, DatabaseSchemaListItem, DatabaseSchemaListResponse,
+    SchemaProblemsGroup
 )
 from datetime import datetime, date
 
@@ -154,8 +155,8 @@ class PublicService:
             for schema in schemas:
                 schema_list.append(DatabaseSchemaListItem(
                     schema_name=schema.schema_name,
-                    schema_description=schema.schema_discription,  # 注意原字段名的拼写
-                    schema_author=schema.sechema_author  # 注意原字段名的拼写
+                    schema_description=schema.schema_discription,
+                    schema_author=schema.schema_author
                 ))
 
             return DatabaseSchemaListResponse(root=schema_list)
@@ -243,6 +244,40 @@ class PublicService:
                 schema_id=schema_id,
                 schema_name=schema_name
             )
+
+    def get_public_problem_list_grouped(self, db: Session) -> List[SchemaProblemsGroup]:
+        """获取按数据库模式分组的题目列表"""
+        try:
+            # 获取所有数据库模式
+            schemas = db.query(DatabaseSchema).all()
+
+            result = []
+
+            for schema in schemas:
+                # 获取该模式下的所有题目
+                problems = db.query(Problem).filter(Problem.schema_id == schema.schema_id).all()
+
+                # 构建题目列表
+                problem_list = []
+                for problem in problems:
+                    problem_list.append(ProblemPublicInfo(
+                        problem_id=problem.problem_id,
+                        is_required=problem.is_required or 0,
+                        problem_content=problem.problem_content or ""
+                    ))
+
+                # 只有当该模式下有题目时才添加到结果中
+                if problem_list:
+                    result.append(SchemaProblemsGroup(
+                        schema_name=schema.schema_name or f"schema_{schema.schema_id}",
+                        problems=problem_list
+                    ))
+
+            return result
+
+        except Exception as e:
+            print(f"获取分组题目列表失败: {e}")
+            return []
 
 # 全局公共服务实例
 public_service = PublicService()

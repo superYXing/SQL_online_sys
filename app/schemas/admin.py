@@ -32,10 +32,71 @@ class SemesterUpdateResponse(BaseModel):
     """学期更新响应模型"""
     success: bool
     message: str
-    semester: SemesterInfo
 
     class Config:
         from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "学期时间更新成功"
+            }
+        }
+
+class SemesterCreateResponse(BaseModel):
+    """学期创建响应模型"""
+    success: bool
+    message: str
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "学期创建成功"
+            }
+        }
+
+class TeacherUpdateResponse(BaseModel):
+    """教师更新响应模型"""
+    success: bool
+    message: str
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "教师信息更新成功"
+            }
+        }
+
+class TeacherCreateResponse(BaseModel):
+    """教师创建响应模型"""
+    success: bool
+    message: str
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "教师创建成功"
+            }
+        }
+
+class TeacherDeleteResponse(BaseModel):
+    """教师删除响应模型"""
+    success: bool
+    message: str
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "教师删除成功"
+            }
+        }
 
 # 教师管理相关模型
 class TeacherCreateRequest(BaseModel):

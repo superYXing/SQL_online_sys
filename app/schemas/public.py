@@ -19,22 +19,41 @@ class CurrentSemesterResponse(BaseModel):
 class ProblemPublicInfo(BaseModel):
     """公共题目信息模型"""
     problem_id: int
-    problem_content: Optional[str]
-    is_required: int = 0
-    schema_id: int = 0
+    is_required: int
+    problem_content: str
 
     class Config:
         from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "problem_id": 5,
+                "is_required": 1,
+                "problem_content": "查询所有员工信息"
+            }
+        }
 
-class ProblemPublicListResponse(BaseModel):
-    """公共题目列表响应模型"""
+class SchemaProblemsGroup(BaseModel):
+    """数据库模式题目分组模型"""
+    schema_name: str
     problems: List[ProblemPublicInfo]
-    total: int
-    schema_id: Optional[int] = None
-    schema_name: Optional[str] = None
 
     class Config:
         from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "schema_name": "ORACLE_HR",
+                "problems": [
+                    {
+                        "problem_id": 5,
+                        "is_required": 1,
+                        "problem_content": "查询所有员工信息"
+                    }
+                ]
+            }
+        }
+
+# 公共题目列表响应类型（数组格式）
+ProblemPublicListResponse = List[SchemaProblemsGroup]
 
 class SemesterInfo(BaseModel):
     """学期信息模型"""

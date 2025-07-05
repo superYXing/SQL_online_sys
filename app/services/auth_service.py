@@ -1,5 +1,9 @@
 from typing import Optional, Tuple
+
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from starlette import status
+
 from models import Student, Teacher
 from models.base import get_db
 from schemas.auth import LoginRequest, UserInfo
@@ -16,11 +20,17 @@ class AuthService:
         user = self._get_user_by_role_and_id(login_data.role, login_data.account, db)
         
         if not user:
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在"
+            )
         
         # 验证密码
         if not self._verify_password(user, login_data.password):
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="密码错误"
+            )
         
         # 创建用户信息
         user_info = self._create_user_info(user, login_data.role)
@@ -132,4 +142,4 @@ class AuthService:
         raise ValueError("未知的用户类型")
 
 # 全局认证服务实例
-auth_service = AuthService() 
+auth_service = AuthService()

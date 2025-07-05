@@ -9,6 +9,8 @@ class AIService:
     def __init__(self):
         self.api_url = os.getenv("AI_API_URL", "https://api.siliconflow.cn/v1/chat/completions")
         self.api_key = os.getenv("AI_API_KEY")
+        self.model = os.getenv("AI_MODEL", "Qwen/QwQ-32B")  # 默认使用QwQ-32B模型
+        self.enable_thinking = os.getenv("AI_ENABLE_THINKING", "false").lower() == "true"
         
     def analyze_sql_answer(
         self, 
@@ -130,24 +132,21 @@ class AIService:
             return "AI服务配置错误，请联系管理员。"
         
         payload = {
-            "model": "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
-            "stream": False,
-            "max_tokens": 8192,
-            "thinking_budget": 32768,
-            "min_p": 0.05,
-            "temperature": 0.7,
-            "top_p": 0.7,
-            "top_k": 50,
-            "frequency_penalty": 0.5,
-            "n": 1,
-            "stop": [],
+            "model": self.model,
             "messages": [
                 {
                     "role": "user",
                     "content": prompt
                 }
-            ]
+            ],
+            "max_tokens": 2048,
+            "temperature": 0.7
         }
+
+        # 根据测试结果，QwQ-32B模型不支持 enable_thinking 参数
+        # 只有特定模型才添加此参数
+        if self.enable_thinking and "Qwen3" in self.model:
+            payload["enable_thinking"] = self.enable_thinking
         
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -156,10 +155,10 @@ class AIService:
         
         try:
             response = requests.post(
-                self.api_url, 
-                json=payload, 
+                self.api_url,
+                json=payload,
                 headers=headers,
-                timeout=30
+                timeout=90  # 增加超时时间到90秒，适应QwQ模型
             )
             
             if response.status_code == 200:

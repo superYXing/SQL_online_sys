@@ -135,7 +135,7 @@ class SchemaCreateRequest(BaseModel):
     html_content: str
     schema_name: str
     sql_engine: str
-    sql_file_content: str  # SQL文件内容（作为字符串传递）
+    sql_file_content: str  # SQL建表语句文本内容
     sql_schema: str
 
     class Config:
@@ -774,6 +774,36 @@ class DatasetExportResponse(BaseModel):
                 },
                 "filename": "ORACLE_HR_export_20240315.json",
                 "export_time": "2024-03-15 14:30:00"
+            }
+        }
+
+# 题目统计相关模型（按接口文档格式）
+class ProblemSummaryData(BaseModel):
+    """题目统计数据模型"""
+    problem_id: int
+    completed_student_count: int  # 完成此题目的学生人数
+    total_submission_count: int   # 此题目的总提交次数
+
+    class Config:
+        from_attributes = True
+
+class ProblemSummaryDocResponse(BaseModel):
+    """题目统计响应模型（按接口文档格式）"""
+    code: int = 200
+    msg: str = "查询成功"
+    data: ProblemSummaryData
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "code": 200,
+                "msg": "查询成功",
+                "data": {
+                    "problem_id": 11,
+                    "completed_student_count": 121,
+                    "total_submission_count": 449
+                }
             }
         }
 

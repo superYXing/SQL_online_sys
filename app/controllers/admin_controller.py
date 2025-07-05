@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from models.base import get_db
 from schemas.admin import (
-    SemesterUpdateRequest, SemesterUpdateResponse, SemesterInfo, SemesterCreateRequest,
-    SemesterListResponse, TeacherCreateRequest, TeacherInfo, TeacherUpdateRequest,
-    TeacherListResponse, OperationResponse, DatabaseSchemaCreateRequest,
+    SemesterUpdateRequest, SemesterUpdateResponse, SemesterInfo, SemesterCreateRequest, SemesterCreateResponse,
+    SemesterListResponse, TeacherCreateRequest, TeacherInfo, TeacherUpdateRequest, TeacherUpdateResponse,
+    TeacherCreateResponse, TeacherDeleteResponse, TeacherListResponse, OperationResponse, DatabaseSchemaCreateRequest,
     DatabaseSchemaUpdateRequest, DatabaseSchemaInfo, DatabaseSchemaListResponse
 )
 # 已删除学生相关Schema导入: StudentCreateRequest, StudentInfo, StudentUpdateRequest, StudentListResponse
@@ -38,7 +38,6 @@ async def update_semester_time(
     返回：
     - success: 是否成功
     - message: 操作结果信息
-    - semester: 更新后的学期信息
     
     注意事项：
     - 开始日期必须早于结束日期
@@ -63,8 +62,7 @@ async def update_semester_time(
         
         return SemesterUpdateResponse(
             success=success,
-            message=message,
-            semester=semester_info
+            message=message
         )
         
     except HTTPException:
@@ -120,7 +118,7 @@ async def get_semester_info(
         )
 
 # 教师管理接口
-@admin_router.post("/teachers", response_model=TeacherInfo, summary="创建教师")
+@admin_router.post("/teachers", response_model=TeacherCreateResponse, summary="创建教师")
 async def create_teacher(
     teacher_data: TeacherCreateRequest,
     current_user: dict = Depends(get_current_admin),
@@ -136,7 +134,9 @@ async def create_teacher(
     - teacher_name: 教师姓名
     - teacher_password: 教师密码
 
-    返回创建的教师信息
+    返回：
+    - success: 是否成功
+    - message: 操作结果信息
     """
     try:
         success, message, teacher_info = user_management_service.create_teacher(
@@ -153,7 +153,10 @@ async def create_teacher(
                 detail=message
             )
 
-        return teacher_info
+        return TeacherCreateResponse(
+            success=success,
+            message=message
+        )
 
     except HTTPException:
         raise
@@ -239,7 +242,7 @@ async def get_teacher(
             detail=f"获取教师信息失败: {str(e)}"
         )
 
-@admin_router.put("/teachers/{teacher_id}", response_model=TeacherInfo, summary="更新教师信息")
+@admin_router.put("/teachers/{teacher_id}", response_model=TeacherUpdateResponse, summary="更新教师信息")
 async def update_teacher(
     teacher_id: str,
     teacher_data: TeacherUpdateRequest,
@@ -258,7 +261,9 @@ async def update_teacher(
     - teacher_name: 教师姓名（可选）
     - teacher_password: 教师密码（可选）
 
-    返回更新后的教师信息
+    返回：
+    - success: 是否成功
+    - message: 操作结果信息
     """
     try:
         success, message, teacher_info = user_management_service.update_teacher(
@@ -275,7 +280,10 @@ async def update_teacher(
                 detail=message
             )
 
-        return teacher_info
+        return TeacherUpdateResponse(
+            success=success,
+            message=message
+        )
 
     except HTTPException:
         raise
@@ -285,7 +293,7 @@ async def update_teacher(
             detail=f"更新教师信息失败: {str(e)}"
         )
 
-@admin_router.delete("/teachers/{teacher_id}", response_model=OperationResponse, summary="删除教师")
+@admin_router.delete("/teachers/{teacher_id}", response_model=TeacherDeleteResponse, summary="删除教师")
 async def delete_teacher(
     teacher_id: str,
     current_user: dict = Depends(get_current_admin),
@@ -298,6 +306,10 @@ async def delete_teacher(
 
     路径参数：
     - teacher_id: 教师ID
+
+    返回：
+    - success: 是否成功
+    - message: 操作结果信息
 
     注意：如果教师有关联的课程，将无法删除
     """
@@ -314,7 +326,10 @@ async def delete_teacher(
                 detail=message
             )
 
-        return OperationResponse(success=success, message=message)
+        return TeacherDeleteResponse(
+            success=success,
+            message=message
+        )
 
     except HTTPException:
         raise
@@ -327,7 +342,7 @@ async def delete_teacher(
 # 已删除: 学生管理接口 - 不再需要在admin控制器中实现
 
 # 学期管理接口
-@admin_router.post("/semesters", response_model=SemesterInfo, summary="创建学期")
+@admin_router.post("/semesters", response_model=SemesterCreateResponse, summary="创建学期")
 async def create_semester(
     semester_data: SemesterCreateRequest,
     current_user: dict = Depends(get_current_admin),
@@ -343,7 +358,9 @@ async def create_semester(
     - begin_date: 开始日期 (YYYY-MM-DD格式)
     - end_date: 结束日期 (YYYY-MM-DD格式)
 
-    返回创建的学期信息
+    返回：
+    - success: 是否成功
+    - message: 操作结果信息
 
     注意事项：
     - 开始日期必须早于结束日期
@@ -364,7 +381,10 @@ async def create_semester(
                 detail=message
             )
 
-        return semester_info
+        return SemesterCreateResponse(
+            success=success,
+            message=message
+        )
 
     except HTTPException:
         raise

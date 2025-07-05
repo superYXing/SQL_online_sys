@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Path, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any
@@ -14,7 +14,7 @@ from schemas.teacher import (
     TeacherProblemListResponse, TeacherSchemaListResponse,
     SQLQueryRequest, SQLQueryResponse, SemesterListResponse,
     StudentProblemStatsRequest, StudentProblemStatsResponse,
-    StudentProfileResponse, ProblemStatisticsResponse, ProblemSummaryResponse,
+    StudentProfileResponse, ProblemStatisticsResponse, ProblemSummaryResponse, ProblemSummaryDocResponse, ProblemSummaryData,
     DatasetExportResponse, ProblemDetailResponse, ProblemEditRequest, ProblemEditResponse,
     TeacherStudentListResponse, ScoreExportRequest, ExportStudentInfo,
     StudentProblemStatisticsResponse, StudentInfoResponse, StudentProfileNewResponse,
@@ -674,59 +674,68 @@ async def get_student_profile(
 # 已删除: 学生题目统计汇总接口 - 功能已整合到其他接口
 
 # 题目完成情况统计接口
-@teacher_router.get("/problem/summary", response_model=ProblemSummaryResponse, summary="获取题目完成情况统计")
+@teacher_router.get("/problem/summary", response_model=ProblemSummaryDocResponse, summary="获取题目完成情况统计")
 async def get_problem_summary(
-    schema_id: Optional[int] = Query(None, description="数据库模式ID，不指定则返回所有题目"),
+    problem_id: int = Query(..., description="题目ID"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    返回题目的完成人数和总提交次数
+    根据题目ID返回该题目的完成人数和总提交次数
 
-    需要登录认证（只有教师可访问）
+    权限要求：需登录，仅教师角色可访问
+    认证方式：必须附带JWT令牌
 
-    查询参数：
-    - schema_id: 数据库模式ID（可选）
+    请求参数：
+    - problem_id: 题目ID（必须）
 
     返回：
-    - 题目完成情况统计
+    - code: 状态码（200表示成功）
+    - msg: 消息（"查询成功"）
+    - data: 题目统计数据
+      - problem_id: 题目ID
+      - completed_student_count: 完成此题目的学生人数
+      - total_submission_count: 此题目的总提交次数
     """
     try:
         from models import Problem, AnswerRecord
         from sqlalchemy import func, distinct
 
-        # 构建查询
-        query = db.query(Problem)
-        if schema_id is not None:
-            query = query.filter(Problem.schema_id == schema_id)
+        # 检查题目是否存在
+        problem = db.query(Problem).filter(Problem.problem_id == problem_id).first()
+        if not problem:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="题目不存在"
+            )
 
-        problems = query.all()
+        # 统计完成该题目的学生人数（至少有一次正确提交）
+        # 使用result_type == 0 表示正确
+        completed_student_count = db.query(distinct(AnswerRecord.student_id)).filter(
+            AnswerRecord.problem_id == problem_id,
+            AnswerRecord.result_type == 0
+        ).count()
 
-        problem_summaries = []
-        for problem in problems:
-            # 统计完成该题目的人数（至少有一次正确提交）
-            completed_count = db.query(distinct(AnswerRecord.student_id)).filter(
-                AnswerRecord.problem_id == problem.problem_id,
-                AnswerRecord.is_correct == True
-            ).count()
+        # 统计该题目的总提交次数
+        total_submission_count = db.query(AnswerRecord).filter(
+            AnswerRecord.problem_id == problem_id
+        ).count()
 
-            # 统计总提交次数
-            total_submissions = db.query(AnswerRecord).filter(
-                AnswerRecord.problem_id == problem.problem_id
-            ).count()
-
-            problem_summaries.append({
-                "problem_id": problem.problem_id,
-                "problem_content": problem.problem_content or "",
-                "completed_count": completed_count,
-                "total_submissions": total_submissions
-            })
-
-        return ProblemSummaryResponse(
-            problems=problem_summaries,
-            total_problems=len(problem_summaries)
+        # 构建响应数据
+        data = ProblemSummaryData(
+            problem_id=problem_id,
+            completed_student_count=completed_student_count,
+            total_submission_count=total_submission_count
         )
 
+        return ProblemSummaryDocResponse(
+            code=200,
+            msg="查询成功",
+            data=data
+        )
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1058,25 +1067,21 @@ async def delete_problem(
 # 数据库模式管理接口
 @teacher_router.post("/schema/create", response_model=SchemaCreateResponse, summary="创建数据库模式")
 async def create_database_schema(
-    html_content: str = Form(..., description="HTML格式文本"),
-    schema_name: str = Form(..., description="数据库模式名称"),
-    sql_engine: str = Form(..., description="SQL引擎类型"),
-    sql_schema: str = Form(..., description="创建数据库模式时的名称"),
-    sql_file: UploadFile = File(..., description="SQL建表文件"),
+    schema_data: SchemaCreateRequest,
     current_user: dict = Depends(get_current_teacher),
     db: Session = Depends(get_db)
 ):
     """
-    根据HTML格式文本、数据库模式名称、SQL引擎和SQL建表文件创建数据库模式
+    根据HTML格式文本、数据库模式名称、SQL引擎和SQL文本创建数据库模式
 
     需要教师身份的JWT认证令牌
 
-    请求参数：
+    请求参数（JSON格式）：
     - html_content: HTML格式文本（必须）
     - schema_name: 数据库模式名称（必须）
     - sql_engine: SQL引擎类型（必须，如：mysql, postgresql, opengauss）
     - sql_schema: 创建数据库模式时的名称（必须）
-    - sql_file: SQL建表文件（必须，.sql文件）
+    - sql_file_content: SQL建表语句文本（必须）
 
     返回：
     - code: 状态码（200表示成功）
@@ -1085,29 +1090,16 @@ async def create_database_schema(
     执行流程：
     1. 判断此模式是否已经存在，如果存在则结束流程
     2. 如果不存在，连接指定的SQL引擎
-    3. 执行SQL文件中的建表语句
+    3. 执行SQL文本中的建表语句
     4. 执行成功后将数据插入到database_schema表中
     """
     try:
-        # 验证文件类型
-        if not sql_file.filename.endswith('.sql'):
+        # 验证SQL文本内容
+        if not schema_data.sql_file_content or not schema_data.sql_file_content.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="SQL文件必须是.sql格式"
+                detail="SQL文本内容不能为空"
             )
-
-        # 读取SQL文件内容
-        sql_file_content = await sql_file.read()
-        sql_file_content = sql_file_content.decode('utf-8')
-
-        # 构建请求数据
-        schema_data = SchemaCreateRequest(
-            html_content=html_content,
-            schema_name=schema_name,
-            sql_engine=sql_engine,
-            sql_file_content=sql_file_content,
-            sql_schema=sql_schema
-        )
 
         success, message, response = teacher_service.create_database_schema(
             teacher_id=current_user["id"],

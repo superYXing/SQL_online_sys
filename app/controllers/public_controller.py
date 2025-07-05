@@ -149,32 +149,26 @@ async def get_all_database_schemas(
             detail=f"获取数据库模式列表失败: {str(e)}"
         )
 
-@public_router.get("/problem/list", response_model=ProblemPublicListResponse, summary="获取题目列表")
+@public_router.get("/problem/list", response_model=ProblemPublicListResponse, summary="获取所有题目列表")
 async def get_problem_list(
-    schema_id: Optional[int] = Query(None, description="数据库模式ID，不指定则返回所有题目"),
-    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    获取题目列表（公共访问）
+    获取所有题目列表
 
-    需要登录认证（所有角色可访问）
+    权限：无需登录
+    可访问角色：所有人
 
-    查询参数：
-    - schema_id: 数据库模式ID（可选），不指定则返回所有题目
-
-    返回：
-    - problems: 题目列表
-    - total: 总题目数
-    - schema_id: 查询的模式ID
-    - schema_name: 模式名称（如果指定了schema_id）
+    返回按数据库模式分组的题目列表：
+    - schema_name: 数据库模式名称
+    - problems: 该模式下的题目列表
+      - problem_id: 题目ID
+      - is_required: 是否必做（0/1）
+      - problem_content: 题目内容
     """
     try:
-        # 获取题目列表
-        problems = public_service.get_public_problem_list(
-            schema_id=schema_id,
-            db=db
-        )
+        # 获取按模式分组的题目列表
+        problems = public_service.get_public_problem_list_grouped(db=db)
 
         return problems
 

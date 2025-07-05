@@ -22,15 +22,7 @@ async def login(
     """
     try:
         # 用户认证
-        result = auth_service.authenticate_user(login_data, db)
-        
-        if not result:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="用户名或密码错误"
-            )
-        
-        user_info, access_token = result
+        user_info, access_token = auth_service.authenticate_user(login_data, db)
         
         # 构造响应数据
         response_data = LoginData(
@@ -44,8 +36,8 @@ async def login(
             data=response_data
         )
         
-    except HTTPException:
-        raise
+    except HTTPException as e:
+        raise e  # 重新引发HTTPException，以便FastAPI可以处理它
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -84,24 +84,23 @@ class SQLMethodService:
 
             # 统计不同的方法（通过SQL关键词序列）
             unique_methods = set()
-            max_method_count = 0
+            total_correct_submissions = 0
 
             for record in records:
-                # 提取SQL关键词序列
-                keywords = tuple(self.extract_sql_keywords(record.answer_content))
-                unique_methods.add(keywords)
+                # 如果回答是正确的，提取SQL关键词序列
+                if record.result_type == 0:
+                    keywords = tuple(self.extract_sql_keywords(record.answer_content))
+                    unique_methods.add(keywords)
+                    total_correct_submissions += 1
 
-                # 检查是否有method_count字段（兼容历史数据）
-                if hasattr(record, 'method_count') and record.method_count:
-                    max_method_count = max(max_method_count, record.method_count)
-
-            # 如果没有method_count数据，使用不同方法的数量作为最大方法数
-            if max_method_count == 0:
-                max_method_count = len(unique_methods)
+            # 计算重复方法数（总正确提交数 - 不同方法数）
+            total_methods = len(unique_methods)
+            repeat_methods = max(0, total_correct_submissions - total_methods)
 
             return {
-                "total_methods": len(unique_methods),
-                "max_method_count": max_method_count
+                "total_methods": total_methods,
+                "repeat_methods": repeat_methods,
+                "max_method_count": total_methods  # 保持向后兼容
             }
 
         except Exception as e:

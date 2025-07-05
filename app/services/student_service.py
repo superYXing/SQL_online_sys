@@ -24,7 +24,7 @@ class StudentService:
             semester_id = current_semester.semester_id
 
 
-            # 根据提供的SQL查询获取学生信息,根据系统时间找到学期id后确定课程范围
+            # 根据提供的SQL查询获取学生信息,根据系学期确定课程范围
 
             result = db.query(
                 Student.student_id,
@@ -44,11 +44,19 @@ class StudentService:
             ).filter(
                 Student.student_id == student_id,
                 Course.semester_id == semester_id
-            )
-            
+            ).first()  # 添加 .first() 来获取第一条记录
+
             if not result:
-                return None
-            
+                # 返回空数据而不是None，保持接口一致性
+                return StudentProfileResponse(
+                    学号="",
+                    姓名="",
+                    班级="",
+                    当前学期="",
+                    课序号="",
+                    任课教师=""
+                )
+
             # 构建响应数据
             return StudentProfileResponse(
                 学号=result.student_id,
@@ -58,28 +66,53 @@ class StudentService:
                 课序号=str(result.course_id) if result.course_id else "",
                 任课教师=result.teacher_name or ""
             )
-            
+
         except Exception as e:
             print(f"获取学生信息失败: {e}")
-            return None
+            # 异常时也返回空数据而不是None
+            return StudentProfileResponse(
+                学号="",
+                姓名="",
+                班级="",
+                当前学期="",
+                课序号="",
+                任课教师=""
+            )
 
     def get_student_rank(self, db: Session, limit: int = 10) -> List[Dict]:
         """获取学生排名"""
         try:
-            # 获取所有有答题记录的学生
-            students_with_records = db.query(
+            # 1. 调用public接口获取当前学期号
+            from services.public_service import public_service
+            current_semester = public_service.get_current_semester(db)
+            if not current_semester:
+                return []
+
+            current_semester_id = current_semester.semester_id
+
+            # 2. 根据学期号确认课程号范围
+            courses = db.query(Course).filter(Course.semester_id == current_semester_id).all()
+            if not courses:
+                return []
+
+            course_ids = [course.course_id for course in courses]
+
+            # 3. 在选课表里根据课程号范围来确定学生名单
+            students_in_semester = db.query(
                 Student.id,
                 Student.student_id,
                 Student.student_name,
                 Student.class_
             ).join(
-                AnswerRecord, AnswerRecord.student_id == Student.id
+                CourseSelection, CourseSelection.student_id == Student.id
+            ).filter(
+                CourseSelection.course_id.in_(course_ids)
             ).distinct().all()
 
             # 计算每个学生的排名数据
             student_rankings = []
 
-            for student in students_with_records:
+            for student in students_in_semester:
                 # 计算正确题目数（result_type = 0的不同题目数量）
                 correct_problems = db.query(
                     distinct(AnswerRecord.problem_id)

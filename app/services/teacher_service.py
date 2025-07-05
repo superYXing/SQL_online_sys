@@ -1052,7 +1052,7 @@ class TeacherService:
                 schema_name=schema_data.schema_name,
                 schema_discription=schema_data.html_content,  # 使用HTML内容作为描述
                 sql_schema=schema_data.sql_schema,  # 保存SQL模式名称
-                sechema_author=teacher.teacher_name or teacher.teacher_id  # 设置作者
+                schema_author=teacher.teacher_name or teacher.teacher_id  # 设置作者
             )
 
             db.add(new_schema)
