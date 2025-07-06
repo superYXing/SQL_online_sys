@@ -9,10 +9,11 @@ from schemas.teacher import (
     TeacherProfileResponse, StudentCreateRequest,
     StudentCreateResponse, ImportFailDetail, StudentImportResponse,
     ScoreCalculateRequest, StudentScoreInfo, ScoreUpdateResponse, ScoreListResponse,
-    TeacherStudentInfo, TeacherStudentListResponse, ScoreExportRequest, ExportStudentInfo,
-    SQLQueryResponse, StudentProfileDocResponse,
-    DatasetExportResponse, StudentCourseAddRequest, StudentCourseAddResponse,
-    SchemaCreateRequest, SchemaCreateResponse, SQLQueryRequest, SQLQueryResponse
+    TeacherStudentInfo, TeacherStudentListResponse,
+    StudentInfoResponse, StudentProfileNewResponse,
+    StudentCourseAddRequest, StudentCourseAddResponse, StudentCourseItem,
+    SchemaCreateRequest, SchemaCreateResponse, SQLQueryRequest, SQLQueryResponse,
+    ProblemCreateRequest, ProblemCreateResponse
 )
 # 已删除无用导入: CourseInfo, TeacherCourseListResponse, StudentGradeInfo, CourseGradeResponse, ProblemStatisticsResponse, DashboardMatrixResponse
 from datetime import datetime
@@ -23,6 +24,61 @@ from services.public_service import public_service
 
 class TeacherService:
     """教师服务类"""
+
+    def _read_file_content(self, file_content: bytes) -> pd.DataFrame:
+        """
+        智能读取文件内容，支持Excel和CSV格式
+        """
+        # 检查文件头部字节来判断文件类型
+        file_header = file_content[:8]
+
+        # Excel文件的魔数标识
+        xlsx_signature = b'\x50\x4b\x03\x04'  # ZIP文件头（.xlsx是ZIP格式）
+        xls_signature = b'\xd0\xcf\x11\xe0'   # OLE文件头（.xls是OLE格式）
+
+        try:
+            # 尝试作为Excel文件读取
+            if file_header.startswith(xlsx_signature):
+                # .xlsx文件
+                return pd.read_excel(io.BytesIO(file_content), engine='openpyxl')
+            elif file_header.startswith(xls_signature):
+                # .xls文件
+                return pd.read_excel(io.BytesIO(file_content), engine='xlrd')
+            else:
+                # 可能是CSV文件或其他文本格式，尝试多种编码
+                encodings = ['utf-8', 'gbk', 'gb2312', 'utf-8-sig']
+
+                for encoding in encodings:
+                    try:
+                        # 尝试作为CSV读取
+                        content_str = file_content.decode(encoding)
+
+                        # 检测分隔符
+                        if '\t' in content_str:
+                            separator = '\t'
+                        elif ',' in content_str:
+                            separator = ','
+                        else:
+                            separator = ','
+
+                        df = pd.read_csv(io.StringIO(content_str), sep=separator)
+
+                        # 验证是否成功读取到数据
+                        if len(df) > 0 and len(df.columns) >= 4:
+                            return df
+
+                    except (UnicodeDecodeError, pd.errors.EmptyDataError):
+                        continue
+
+                # 如果所有方法都失败，最后尝试强制使用Excel引擎
+                try:
+                    return pd.read_excel(io.BytesIO(file_content), engine='openpyxl')
+                except Exception:
+                    return pd.read_excel(io.BytesIO(file_content), engine='xlrd')
+
+        except Exception as e:
+            raise Exception(f"无法读取文件内容。请确保文件是有效的Excel文件(.xlsx/.xls)或CSV文件。错误详情: {str(e)}")
+
     
     def get_teacher_profile(self, teacher_id: str, db: Session) -> Optional[TeacherProfileResponse]:
         """获取教师个人信息"""
@@ -180,6 +236,110 @@ class TeacherService:
             print(f"添加学生选课信息失败: {e}")
             return False, f"添加失败: {str(e)}", None
 
+    def add_student_course_batch(self, teacher_id: str, course_data_list: List[StudentCourseItem],
+                                db: Session) -> Tuple[bool, str, Optional[StudentCourseAddResponse]]:
+        """批量添加学生选课信息"""
+        try:
+            # 验证教师是否存在
+            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
+            if not teacher:
+                return False, "教师不存在", None
+
+            # 获取当前学期ID
+            from services.public_service import public_service
+            current_semester = public_service.get_current_semester(db)
+            if not current_semester:
+                return False, "无法获取当前学期信息", None
+
+            success_count = 0
+            fail_count = 0
+            error_messages = []
+
+            # 批量处理每个学生的选课信息
+            for course_data in course_data_list:
+                try:
+                    # 验证课程是否存在
+                    course = db.query(Course).filter(Course.course_id == course_data.course_id).first()
+                    if not course:
+                        fail_count += 1
+                        error_messages.append(f"课程ID {course_data.course_id} 不存在")
+                        continue
+
+                    # 检查学生是否已存在
+                    existing_student = db.query(Student).filter(
+                        Student.student_id == course_data.student_id
+                    ).first()
+
+                    if existing_student:
+                        # 学生已存在，检查是否已经选择了该课程
+                        existing_selection = db.query(CourseSelection).filter(
+                            CourseSelection.student_id == existing_student.id,
+                            CourseSelection.course_id == course_data.course_id,
+                            CourseSelection.semester_id == current_semester.semester_id
+                        ).first()
+
+                        if existing_selection:
+                            fail_count += 1
+                            error_messages.append(f"学生 {course_data.student_id} 已经选择了课程 {course_data.course_id}")
+                            continue
+
+                        # 创建选课记录
+                        new_selection = CourseSelection(
+                            student_id=existing_student.id,
+                            course_id=course_data.course_id,
+                            status=course_data.status,
+                            semester_id=current_semester.semester_id,
+                            score=0  # 默认分数为0
+                        )
+
+                        db.add(new_selection)
+                        success_count += 1
+
+                    else:
+                        # 学生不存在，先创建学生
+                        new_student = Student(
+                            student_id=course_data.student_id,
+                            student_name=course_data.student_name,
+                            class_=course_data.class_,
+                            student_password="default@password"  # 默认密码
+                        )
+
+                        db.add(new_student)
+                        db.flush()  # 获取新学生的ID
+
+                        # 创建选课记录
+                        new_selection = CourseSelection(
+                            student_id=new_student.id,
+                            course_id=course_data.course_id,
+                            status=course_data.status,
+                            semester_id=current_semester.semester_id,
+                            score=0  # 默认分数为0
+                        )
+
+                        db.add(new_selection)
+                        success_count += 1
+
+                except Exception as e:
+                    fail_count += 1
+                    error_messages.append(f"处理学生 {course_data.student_id} 时出错: {str(e)}")
+
+            # 提交事务
+            if success_count > 0:
+                db.commit()
+                
+            if fail_count > 0:
+                message = f"批量添加完成，成功 {success_count} 条，失败 {fail_count} 条。错误详情: {'; '.join(error_messages[:5])}"  # 只显示前5个错误
+            else:
+                message = f"批量添加成功，共处理 {success_count} 条记录"
+
+            response = StudentCourseAddResponse(code=200, msg="添加成功")
+            return True, message, response
+
+        except Exception as e:
+            db.rollback()
+            print(f"批量添加学生选课信息失败: {e}")
+            return False, f"批量添加失败: {str(e)}", None
+
     def import_students_from_excel(self, teacher_id: str, file_content: bytes,
                                   db: Session) -> StudentImportResponse:
         """从Excel文件批量导入学生"""
@@ -195,13 +355,13 @@ class TeacherService:
                     fail_details=[]
                 )
 
-            # 读取Excel文件
+            # 读取文件内容
             try:
-                df = pd.read_excel(io.BytesIO(file_content))
+                df = self._read_file_content(file_content)
             except Exception as e:
                 return StudentImportResponse(
                     code=400,
-                    msg=f"Excel文件格式错误: {str(e)}",
+                    msg=f"文件读取失败: {str(e)}",
                     success_count=0,
                     fail_count=0,
                     fail_details=[]
@@ -601,84 +761,7 @@ class TeacherService:
             print(f"获取学生列表失败: {e}")
             return TeacherStudentListResponse(students=[], total=0, page=page, limit=limit)
 
-    def export_scores_to_excel(self, students_data: List[ExportStudentInfo]) -> bytes:
-        """将学生分数数据导出为Excel文件"""
-        try:
-            import io
-            from openpyxl import Workbook
-            from openpyxl.styles import Font, Alignment, PatternFill
-            from datetime import datetime
 
-            # 创建工作簿
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "成绩表"
-
-            # 设置表头
-            headers = ["学号", "姓名", "班级", "课序号", "状态", "总分数"]
-            for col, header in enumerate(headers, 1):
-                cell = ws.cell(row=1, column=col, value=header)
-                cell.font = Font(bold=True, color="FFFFFF")
-                cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-                cell.alignment = Alignment(horizontal="center", vertical="center")
-
-            # 填充数据
-            for row, student in enumerate(students_data, 2):
-                ws.cell(row=row, column=1, value=student.student_id)
-                ws.cell(row=row, column=2, value=student.student_name)
-                ws.cell(row=row, column=3, value=student.class_)
-                ws.cell(row=row, column=4, value=student.course_id)
-                ws.cell(row=row, column=5, value=student.status)
-                ws.cell(row=row, column=6, value=student.total_score)
-
-                # 设置数据行样式
-                for col in range(1, 7):
-                    cell = ws.cell(row=row, column=col)
-                    cell.alignment = Alignment(horizontal="center", vertical="center")
-
-            # 调整列宽
-            column_widths = [15, 10, 15, 8, 8, 10]
-            for col, width in enumerate(column_widths, 1):
-                ws.column_dimensions[chr(64 + col)].width = width
-
-            # 保存到内存
-            excel_buffer = io.BytesIO()
-            wb.save(excel_buffer)
-            excel_buffer.seek(0)
-
-            return excel_buffer.getvalue()
-
-        except Exception as e:
-            print(f"生成Excel文件失败: {e}")
-            raise Exception(f"生成Excel文件失败: {str(e)}")
-
-    def generate_export_filename(self, students_data: List[ExportStudentInfo]) -> str:
-        """生成导出文件名"""
-        try:
-            from datetime import datetime
-
-            if not students_data:
-                return f"成绩表-{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-
-            # 获取学期和班级信息（这里简化处理，实际可以从数据库查询）
-            first_student = students_data[0]
-            class_name = first_student.class_
-
-            # 提取班级中的数字部分作为班级标识
-            import re
-            class_match = re.search(r'(\d+)', class_name)
-            class_num = class_match.group(1) if class_match else "未知班级"
-
-            # 生成文件名：学期-班级-成绩表.xlsx
-            current_year = datetime.now().year
-            semester = f"{current_year}年春季"  # 可以根据实际情况调整
-            filename = f"{semester}-{class_num}班-成绩表.xlsx"
-
-            return filename
-
-        except Exception as e:
-            print(f"生成文件名失败: {e}")
-            return f"成绩表-{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
     # 已删除: get_dashboard_matrix 方法 - 接口已废弃
 
@@ -855,152 +938,104 @@ class TeacherService:
             print(f"获取学生答题概况失败: {e}")
             return None
 
-    def export_dataset(self, schema_name: str, format: str, db: Session) -> Tuple[Optional[Any], str, str]:
-        """导出数据库模式相关数据"""
-        try:
-            # 获取数据库模式
-            schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_name == schema_name).first()
-            if not schema:
-                return None, "数据库模式不存在", ""
 
-            # 获取当前学期
-            from services.public_service import public_service
-            current_semester = public_service.get_current_semester(db)
-            if not current_semester:
-                return None, "未找到当前学期", ""
 
-            # 根据数据库模式获取题目范围
-            problems = db.query(Problem).filter(Problem.schema_id == schema.schema_id).all()
-            if not problems:
-                return None, "该数据库模式下没有题目", ""
 
-            problem_ids = [p.problem_id for p in problems]
-
-            # 获取当前学期的所有学生
-            students = db.query(Student).join(
-                CourseSelection, Student.id == CourseSelection.student_id
-            ).join(
-                Course, CourseSelection.course_id == Course.course_id
-            ).filter(
-                Course.semester_id == current_semester.semester_id
-            ).distinct().all()
-
-            # 构建导出数据
-            export_data = []
-            for student in students:
-                # 查询该学生在指定题目范围内的所有提交记录
-                answer_records = db.query(AnswerRecord).filter(
-                    AnswerRecord.student_id == student.id,
-                    AnswerRecord.problem_id.in_(problem_ids)
-                ).all()
-
-                if answer_records:  # 只导出有提交记录的学生
-                    # 计算统计数据
-                    submit_count = len(answer_records)
-                    correct_count = sum(1 for record in answer_records if record.result_type == 0)
-
-                    # 计算完成题目总数（去重）
-                    completed_problem_ids = set(record.problem_id for record in answer_records)
-                    problem_count = len(completed_problem_ids)
-
-                    # 计算不同解法数量（根据不同的SQL语句）
-                    unique_sqls = set(record.student_answer for record in answer_records if record.student_answer)
-                    method_count = len(unique_sqls)
-
-                    export_data.append({
-                        "student_id": student.student_id,
-                        "student_name": student.student_name or "",
-                        "class": student.class_ or "",
-                        "problem_count": problem_count,
-                        "submit_count": submit_count,
-                        "correct_count": correct_count,
-                        "method_count": method_count
-                    })
-
-            if not export_data:
-                return None, "没有找到相关数据", ""
-
-            # 根据格式生成文件
-            if format.upper() == "XLSX":
-                file_data, filename, media_type = self._generate_excel_export(export_data, schema_name)
-                return file_data, "", media_type
-            elif format.upper() == "JSON":
-                file_data, filename, media_type = self._generate_json_export(export_data, schema_name)
-                return file_data, "", media_type
-            elif format.upper() == "XML":
-                file_data, filename, media_type = self._generate_xml_export(export_data, schema_name)
-                return file_data, "", media_type
-            else:
-                return None, "不支持的导出格式", ""
-
-        except Exception as e:
-            print(f"导出数据失败: {e}")
-            return None, f"导出数据失败: {str(e)}", ""
-
-    def _generate_excel_export(self, data: List[Dict], schema_name: str) -> Tuple[io.BytesIO, str, str]:
-        """生成Excel格式导出"""
-        try:
-            df = pd.DataFrame(data)
-
-            # 重命名列
-            df.columns = ["学号", "姓名", "班级", "题目数", "提交数", "正确数", "解法数"]
-
-            # 创建Excel文件
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df.to_excel(writer, sheet_name=schema_name, index=False)
-
-            output.seek(0)
-            filename = f"{schema_name}_数据导出_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-            return output, filename, media_type
-
-        except Exception as e:
-            print(f"生成Excel导出失败: {e}")
-            raise
-
-    def _generate_json_export(self, data: List[Dict], schema_name: str) -> Tuple[io.BytesIO, str, str]:
-        """生成JSON格式导出"""
-        try:
-            json_str = json.dumps(data, ensure_ascii=False, indent=2)
-            output = io.BytesIO(json_str.encode('utf-8'))
-            filename = f"{schema_name}_数据导出_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            media_type = "application/json"
-
-            return output, filename, media_type
-
-        except Exception as e:
-            print(f"生成JSON导出失败: {e}")
-            raise
-
-    def _generate_xml_export(self, data: List[Dict], schema_name: str) -> Tuple[io.BytesIO, str, str]:
-        """生成XML格式导出"""
-        try:
-            # 简单的XML生成
-            xml_lines = ['<?xml version="1.0" encoding="UTF-8"?>']
-            xml_lines.append(f'<{schema_name}_export>')
-
-            for item in data:
-                xml_lines.append('  <student>')
-                for key, value in item.items():
-                    xml_lines.append(f'    <{key}>{value}</{key}>')
-                xml_lines.append('  </student>')
-
-            xml_lines.append(f'</{schema_name}_export>')
-
-            xml_str = '\n'.join(xml_lines)
-            output = io.BytesIO(xml_str.encode('utf-8'))
-            filename = f"{schema_name}_数据导出_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
-            media_type = "application/xml"
-
-            return output, filename, media_type
-
-        except Exception as e:
-            print(f"生成XML导出失败: {e}")
-            raise
 
     # 已删除: get_problem_statistics 方法 - 功能已整合到其他方法
+
+    def get_all_problems(self, db: Session) -> 'TeacherProblemListDocResponse':
+        """获取所有题目列表"""
+        try:
+            from schemas.teacher import TeacherProblemListDocResponse, TeacherProblemItem
+
+            # 查询所有题目
+            problems = db.query(Problem).all()
+
+            # 构建题目列表
+            problem_list = []
+            for problem in problems:
+                problem_list.append(TeacherProblemItem(
+                    problem_id=problem.problem_id,
+                    is_required=problem.is_required or 0,
+                    is_ordered=problem.is_ordered or 0,
+                    problem_content=problem.problem_content or "",
+                    example_sql=problem.example_sql or ""
+                ))
+
+            return TeacherProblemListDocResponse(
+                code=200,
+                msg="查询成功",
+                data=problem_list
+            )
+
+        except Exception as e:
+            print(f"获取所有题目列表失败: {e}")
+            from schemas.teacher import TeacherProblemListDocResponse
+            return TeacherProblemListDocResponse(
+                code=500,
+                msg=f"获取题目列表失败: {str(e)}",
+                data=[]
+            )
+
+    def create_problem(self, teacher_id: str, problem_data: ProblemCreateRequest, db: Session) -> ProblemCreateResponse:
+        """创建题目"""
+        try:
+            # 验证教师是否存在
+            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
+            if not teacher:
+                return ProblemCreateResponse(
+                    code=400,
+                    msg="教师不存在"
+                )
+
+            # 验证必要参数
+            if problem_data.problem_content is None or problem_data.problem_content.strip() == "":
+                return ProblemCreateResponse(
+                    code=400,
+                    msg="题目内容不能为空"
+                )
+
+            if problem_data.example_sql is None or problem_data.example_sql.strip() == "":
+                return ProblemCreateResponse(
+                    code=400,
+                    msg="示例SQL不能为空"
+                )
+
+            # 如果指定了schema_id，验证数据库模式是否存在
+            if problem_data.schema_id is not None:
+                schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == problem_data.schema_id).first()
+                if not schema:
+                    return ProblemCreateResponse(
+                        code=400,
+                        msg="指定的数据库模式不存在"
+                    )
+
+            # 创建新题目
+            new_problem = Problem(
+                schema_id=problem_data.schema_id,
+                problem_content=problem_data.problem_content.strip(),
+                is_required=problem_data.is_required,
+                is_ordered=problem_data.is_ordered,
+                example_sql=problem_data.example_sql.strip()
+            )
+
+            db.add(new_problem)
+            db.commit()
+            db.refresh(new_problem)
+
+            return ProblemCreateResponse(
+                code=200,
+                msg="题目创建成功"
+            )
+
+        except Exception as e:
+            db.rollback()
+            print(f"创建题目失败: {e}")
+            return ProblemCreateResponse(
+                code=500,
+                msg=f"创建题目失败: {str(e)}"
+            )
 
     def create_database_schema(self, teacher_id: str, schema_data: SchemaCreateRequest,
                               db: Session) -> Tuple[bool, str, Optional[SchemaCreateResponse]]:
@@ -1012,16 +1047,16 @@ class TeacherService:
                 return False, "教师不存在", None
 
             # 验证必要参数
-            if not schema_data.html_content or not schema_data.html_content.strip():
-                return False, "HTML内容不能为空", None
+            if not schema_data.schema_description or not schema_data.schema_description.strip():
+                return False, "模式描述不能为空", None
             if not schema_data.schema_name or not schema_data.schema_name.strip():
                 return False, "数据库模式名称不能为空", None
-            if not schema_data.sql_engine or not schema_data.sql_engine.strip():
-                return False, "SQL引擎类型不能为空", None
             if not schema_data.sql_file_content or not schema_data.sql_file_content.strip():
                 return False, "SQL文件内容不能为空", None
             if not schema_data.sql_schema or not schema_data.sql_schema.strip():
                 return False, "SQL模式名称不能为空", None
+            if not schema_data.schema_author or not schema_data.schema_author.strip():
+                return False, "模式作者不能为空", None
 
             # 1. 判断此模式是否已经存在
             existing_schema = db.query(DatabaseSchema).filter(
@@ -1030,18 +1065,32 @@ class TeacherService:
             if existing_schema:
                 return False, f"数据库模式 '{schema_data.schema_name}' 已存在", None
 
-            # 2. 验证SQL引擎类型
-            supported_engines = ["mysql", "postgresql", "opengauss"]
-            if schema_data.sql_engine.lower() not in supported_engines:
-                return False, f"不支持的SQL引擎类型: {schema_data.sql_engine}。支持的类型: {', '.join(supported_engines)}", None
-
-            # 3. 连接指定的SQL引擎并执行SQL文件
+            # 2. 连接指定的SQL引擎并执行SQL文件
             from services.database_engine_service import database_engine_service
 
-            # 执行SQL文件中的建表语句
+            # 使用默认的PostgreSQL引擎
+            engine_type = "postgresql"
+
+            # 根据引擎类型构建schema创建和切换语句
+            if engine_type == "mysql":
+                # MySQL使用USE语句
+                schema_setup_sql = f"CREATE DATABASE IF NOT EXISTS {schema_data.sql_schema};\nUSE {schema_data.sql_schema};"
+            elif engine_type in ["postgresql", "opengauss"]:
+                # PostgreSQL/OpenGauss使用CREATE SCHEMA和SET search_path
+                schema_setup_sql = f"CREATE SCHEMA IF NOT EXISTS {schema_data.sql_schema};\nSET search_path TO {schema_data.sql_schema};"
+            else:
+                # 默认使用PostgreSQL语法
+                schema_setup_sql = f"CREATE SCHEMA IF NOT EXISTS {schema_data.sql_schema};\nSET search_path TO {schema_data.sql_schema};"
+
+            # 组合完整的SQL语句：schema创建 + 用户SQL文件内容
+            complete_sql = schema_setup_sql + "\n" + schema_data.sql_file_content
+
+            print(f"执行完整SQL语句: {complete_sql}")
+
+            # 执行完整的SQL语句
             success, error_msg, _ = database_engine_service.execute_sql(
-                sql=schema_data.sql_file_content,
-                engine_type=schema_data.sql_engine.lower()
+                sql=complete_sql,
+                engine_type=engine_type
             )
 
             if not success:
@@ -1050,9 +1099,9 @@ class TeacherService:
             # 4. 执行成功后将数据插入到database_schema表中
             new_schema = DatabaseSchema(
                 schema_name=schema_data.schema_name,
-                schema_discription=schema_data.html_content,  # 使用HTML内容作为描述
+                schema_discription=schema_data.schema_description,  # 使用模式描述
                 sql_schema=schema_data.sql_schema,  # 保存SQL模式名称
-                schema_author=teacher.teacher_name or teacher.teacher_id  # 设置作者
+                schema_author=schema_data.schema_author  # 使用请求中的作者
             )
 
             db.add(new_schema)
@@ -1070,6 +1119,48 @@ class TeacherService:
             db.rollback()
             print(f"创建数据库模式失败: {e}")
             return False, f"创建失败: {str(e)}", None
+
+    def get_student_answer_records(self, semester_ids: List[int], db: Session) -> List[Dict[str, Any]]:
+        """根据学期ID列表获取学生答题记录"""
+        try:
+            from schemas.teacher import StudentAnswerRecord
+            from models.course_selection import CourseSelection
+            
+            # 根据学期ID从选课表中获取学生范围，然后查询这些学生的答题记录
+            records = db.query(
+                Student.student_id,
+                Problem.problem_content,
+                AnswerRecord.result_type,
+                AnswerRecord.answer_content,
+                AnswerRecord.timestep
+            ).join(
+                AnswerRecord, Student.id == AnswerRecord.student_id
+            ).join(
+                Problem, AnswerRecord.problem_id == Problem.problem_id
+            ).join(
+                CourseSelection, Student.id == CourseSelection.student_id
+            ).filter(
+                CourseSelection.semester_id.in_(semester_ids)
+            ).order_by(
+                AnswerRecord.timestep.desc()
+            ).all()
+
+            # 转换为字典列表
+            result = []
+            for record in records:
+                result.append({
+                    "student_id": record.student_id,
+                    "problem_content": record.problem_content or "",
+                    "result_type": record.result_type,
+                    "answer_content": record.answer_content or "",
+                    "timestep": record.timestep.strftime("%Y-%m-%d %H:%M:%S") if record.timestep else ""
+                })
+
+            return result
+
+        except Exception as e:
+            print(f"获取学生答题记录失败: {e}")
+            return []
 
 # 全局教师服务实例
 teacher_service = TeacherService()

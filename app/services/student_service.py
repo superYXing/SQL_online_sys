@@ -283,7 +283,7 @@ class StudentService:
             else:
                 # 语法正确，进行结果比较
                 # 根据题目的is_orderd字段选择比较方式
-                is_ordered = problem.is_orderd if problem.is_orderd is not None else 0
+                is_ordered = problem.is_ordered if problem.is_ordered is not None else 0
 
                 # 构建完整的SQL语句（包含数据库切换语句）
                 def build_full_sql(sql_content):

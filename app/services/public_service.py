@@ -154,9 +154,10 @@ class PublicService:
             schema_list = []
             for schema in schemas:
                 schema_list.append(DatabaseSchemaListItem(
-                    schema_name=schema.schema_name,
-                    schema_description=schema.schema_discription,
-                    schema_author=schema.schema_author
+                    schema_id=schema.schema_id,
+                    schema_name=schema.schema_name or "",
+                    schema_description=schema.schema_discription or "",
+                    schema_author=schema.schema_author or ""
                 ))
 
             return DatabaseSchemaListResponse(root=schema_list)

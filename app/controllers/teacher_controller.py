@@ -11,22 +11,26 @@ from schemas.teacher import (
     TeacherProfileResponse, TeacherCourseListResponse, CourseGradeResponse,
     StudentCreateRequest, StudentCreateResponse, StudentImportResponse,
     ScoreCalculateRequest, ScoreUpdateResponse, ScoreListResponse,
-    TeacherProblemListResponse, TeacherSchemaListResponse,
+    TeacherProblemListResponse, TeacherSchemaListResponse, TeacherProblemListDocResponse, TeacherProblemItem,
+    StudentScoreListResponse, StudentScoreItem, SchemaUpdateRequest, SchemaUpdateResponse,
     SQLQueryRequest, SQLQueryResponse, SemesterListResponse,
     StudentProblemStatsRequest, StudentProblemStatsResponse,
+    StudentAnswerRecordsRequest, StudentAnswerRecordsResponse,
     StudentProfileResponse, ProblemStatisticsResponse, ProblemSummaryResponse, ProblemSummaryDocResponse, ProblemSummaryData,
-    DatasetExportResponse, ProblemDetailResponse, ProblemEditRequest, ProblemEditResponse,
-    TeacherStudentListResponse, ScoreExportRequest, ExportStudentInfo,
+    ProblemDetailResponse, ProblemEditRequest, ProblemEditResponse,
+    TeacherStudentListResponse,
     StudentProblemStatisticsResponse, StudentInfoResponse, StudentProfileNewResponse,
     StudentProfileDocResponse, StudentDetailResponse, StudentScoreExportRequest,
     ProblemDeleteResponse, StudentCourseAddRequest, StudentCourseAddResponse,
-    SchemaCreateRequest, SchemaCreateResponse, SQLQueryRequest, SQLQueryResponse
+    SchemaCreateRequest, SchemaCreateResponse, SQLQueryRequest, SQLQueryResponse,
+    ProblemCreateRequest, ProblemCreateResponse, StudentDetailInfo, StudentUpdateRequest, StudentUpdateResponse
 )
 from schemas.admin import StudentInfo, StudentListResponse, OperationResponse
 from schemas.response import BaseResponse
 from services.teacher_service import teacher_service
 from services.user_management_service import user_management_service
 from services.student_service import student_service
+from services.admin_service import admin_service
 from services.auth_dependency import get_current_teacher, get_current_user, get_current_admin, get_current_teacher_or_admin
 
 teacher_router = APIRouter(prefix="/teacher", tags=["教师"])
@@ -90,21 +94,21 @@ async def add_student_course(
     db: Session = Depends(get_db)
 ):
     """
-    创建新的学生选课信息
+    批量创建学生选课信息
 
     需要教师或管理员身份的JWT认证令牌
 
-    请求参数：
+    请求参数（数组格式）：
     - student_id: 学生ID（学号）
     - student_name: 学生姓名
     - class_: 班级
-    - status: 状态（0为重修，1为正常）
+    - status: 状态（0为正常，1为重修）
     - course_id: 课程ID
 
     逻辑：
     - 先在学生表里创建一条学生信息，包括学号，姓名，班级，默认密码为"default@password"
     - 之后在选课表里增加信息，包括学生id（学生表外键），课程id（课程表外键），
-      状态（0为重修，1为正常），学期id（学期表外键），分数（默认0）
+      状态（0为正常，1为重修），学期id（学期表外键），分数（默认0）
     - 注意学期id用public接口获取当前学期id
 
     返回：
@@ -112,9 +116,9 @@ async def add_student_course(
     - msg: 消息
     """
     try:
-        success, message, response = teacher_service.add_student_course(
+        success, message, response = teacher_service.add_student_course_batch(
             teacher_id=current_user["id"],
-            course_data=course_data,
+            course_data_list=course_data.students,
             db=db
         )
 
@@ -134,56 +138,7 @@ async def add_student_course(
             detail=f"添加学生选课信息失败: {str(e)}"
         )
 
-@teacher_router.post("/students/import", response_model=StudentImportResponse, summary="批量导入学生")
-async def import_students(
-    file: UploadFile = File(..., description="Excel文件，包含学号、姓名、班级、密码列"),
-    current_user: dict = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
-):
-    """
-    从Excel文件批量导入学生
 
-    需要教师身份的JWT认证令牌
-
-    文件要求：
-    - 格式：Excel文件（.xlsx 或 .xls）
-    - 必需列：学号、姓名、班级、密码
-    - 第一行为表头
-
-    返回：
-    - code: 状态码
-    - msg: 消息
-    - success_count: 成功导入数量
-    - fail_count: 失败数量
-    - fail_details: 失败详情列表
-    """
-    try:
-        # 验证文件类型
-        if not file.filename.endswith(('.xlsx', '.xls')):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="文件格式不正确，请上传Excel文件（.xlsx或.xls）"
-            )
-
-        # 读取文件内容
-        file_content = await file.read()
-
-        # 调用服务层处理导入
-        result = teacher_service.import_students_from_excel(
-            teacher_id=current_user["id"],
-            file_content=file_content,
-            db=db
-        )
-
-        return result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"批量导入学生失败: {str(e)}"
-        )
 
 # 学生管理接口
 @teacher_router.get("/students", response_model=TeacherStudentListResponse, summary="获取学生列表")
@@ -234,7 +189,7 @@ async def get_students(
             detail=f"获取学生列表失败: {str(e)}"
         )
 
-@teacher_router.get("/students/{student_id}", response_model=StudentInfo, summary="获取学生信息")
+@teacher_router.get("/students/{student_id}", response_model=StudentDetailInfo, summary="获取学生信息")
 async def get_student(
     student_id: str,
     current_user: dict = Depends(get_teacher_or_admin),
@@ -248,7 +203,12 @@ async def get_student(
     路径参数：
     - student_id: 学生ID
 
-    返回学生的详细信息
+    返回学生的详细信息，包括：
+    - id: 数据库主键
+    - student_id: 学生学号
+    - student_name: 学生姓名
+    - class_: 班级
+    - course_id: 课程ID（基于当前学期的选课记录）
     """
     try:
         student_info = user_management_service.get_student_by_id(
@@ -273,10 +233,10 @@ async def get_student(
             detail=f"获取学生信息失败: {str(e)}"
         )
 
-@teacher_router.put("/students/{student_id}", response_model=StudentInfo, summary="更新学生信息")
+@teacher_router.put("/students/{student_id}", response_model=StudentUpdateResponse, summary="更新学生信息")
 async def update_student(
     student_id: str,
-    student_data: StudentCreateRequest,
+    student_data: StudentUpdateRequest,
     current_user: dict = Depends(get_teacher_or_admin),
     db: Session = Depends(get_db)
 ):
@@ -289,20 +249,18 @@ async def update_student(
     - student_id: 学生ID
 
     请求参数：
-    - student_name: 学生姓名
-    - class_: 班级
-    - student_password: 学生密码
+    - student_name: 学生姓名（可选）
+    - class_: 班级（可选）
+    - student_password: 学生密码（可选，若不传则不改变密码）
 
-    返回更新后的学生信息，格式与管理员接口一致：
+    返回标准化响应格式：
     {
-      "id": 1,
-      "student_id": "20232251177",
-      "student_name": "张三",
-      "class_": "计算机科学与技术1班"
+      "code": 200,
+      "msg": "更新成功"
     }
     """
     try:
-        success, message, student_info = user_management_service.update_student(
+        success, message, response = user_management_service.update_student(
             student_id=student_id,
             student_name=student_data.student_name,
             class_=student_data.class_,
@@ -317,7 +275,7 @@ async def update_student(
                 detail=message
             )
 
-        return student_info
+        return response
 
     except HTTPException:
         raise
@@ -450,66 +408,259 @@ async def get_student_scores(
 # 当前学期接口已移至 /public 路径
 # 请使用 GET /public/currentSemester 替代此接口
 
-@teacher_router.post("/score/export", summary="导出核算分数结果")
-async def export_scores(
-    export_request: ScoreExportRequest,
+
+
+# 修改数据库模式接口
+@teacher_router.put("/schema/update", response_model=SchemaUpdateResponse, summary="修改数据库模式")
+async def update_database_schema(
+    request: SchemaUpdateRequest,
     current_user: dict = Depends(get_current_teacher),
     db: Session = Depends(get_db)
 ):
     """
-    将前端传入的学生分数信息列表生成 Excel 文件并返回
+    根据html格式文本，数据库模式名称，sql引擎和sql建表文件和sql_schema修改数据库模式
 
-    需要教师身份的JWT认证令牌
+    权限：需登录，仅教师角色可访问
 
     请求参数：
-    - students: 学生信息列表，包含学生详细分数数据
+    - schema_id: 数据库模式ID
+    - schema_description: html格式文本描述
+    - schema_name: 数据库模式名称
+    - sql_file_content: SQL建表语句文本内容（可选）
+    - sql_schema: 创建数据库模式时的名称
+    - schema_author: 模式作者
 
-    返回：Excel 文件流
-    文件名示例：2025年春季-三班-成绩表.xlsx
-
-    文件生成逻辑：
-    - 根据前端提交的 students 列表逐条写入 Excel
-    - 文件名可根据学期、班级、时间自动拼接
-    - 文件生成后直接返回文件流，前端可选择下载
-
-    Excel 文件列：学号、姓名、班级、课序号、状态、总分数
+    返回：
+    - code: 状态码（200表示成功）
+    - msg: 消息（"修改数据库模式成功"）
     """
     try:
-        if not export_request.students:
+        from models import DatabaseSchema
+        from services.database_engine_service import database_engine_service
+
+        # 检查数据库模式是否存在
+        schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == request.schema_id).first()
+        if not schema:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="学生信息列表不能为空"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="数据库模式不存在"
             )
 
-        # 生成Excel文件
-        excel_data = teacher_service.export_scores_to_excel(export_request.students)
+        # 如果提供了SQL文件内容，则执行SQL更新
+        if request.sql_file_content and request.sql_file_content.strip():
+            try:
+                # 使用PostgreSQL引擎
+                sql_engine = 'postgresql'  # 默认使用postgresql
+                
+                # 检查引擎是否可用
+                if sql_engine not in database_engine_service.engines:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"数据库引擎 {sql_engine} 不可用"
+                    )
+                
+                engine = database_engine_service.engines[sql_engine]
 
-        # 生成文件名
-        filename = teacher_service.generate_export_filename(export_request.students)
+                # 执行SQL
+                with engine.connect() as connection:
+                    from sqlalchemy import text
+                    
+                    # 切换到指定的数据库/模式
+                    if sql_engine == "mysql":
+                        connection.execute(text(f"USE {request.sql_schema}"))
+                    elif sql_engine in ["postgresql", "opengauss"]:
+                        connection.execute(text(f"SET search_path TO {request.sql_schema}"))
 
-        # 创建文件流
-        excel_stream = io.BytesIO(excel_data)
+                    # 执行SQL内容
+                    connection.execute(text(request.sql_file_content))
+                    connection.commit()
 
-        # 返回Excel文件流
-        return StreamingResponse(
-            io.BytesIO(excel_data),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={
-                "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
-                "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            }
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"执行SQL失败: {str(e)}"
+                )
+
+        # 更新数据库模式记录
+        schema.schema_name = request.schema_name
+        schema.schema_discription = request.schema_description
+        schema.sql_schema = request.sql_schema
+        schema.schema_author = request.schema_author
+
+        db.commit()
+
+        return SchemaUpdateResponse(
+            code=200,
+            msg="修改数据库模式成功"
         )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"修改数据库模式失败: {str(e)}"
+        )
+
+# 获取学生分数接口
+@teacher_router.get("/score", response_model=StudentScoreListResponse, summary="获取学生分数")
+async def get_student_scores(
+    current_user: dict = Depends(get_current_teacher),
+    db: Session = Depends(get_db)
+):
+    """
+    查询当前学期所有课程下学生的总分数
+
+    权限：需登录，仅教师角色可访问
+
+    请求参数：无（会自动根据当前学期进行查询）
+
+    返回：
+    - code: 状态码（200表示成功）
+    - msg: 消息（空字符串）
+    - scorelist: 学生分数列表
+      - course_id: 课程ID
+      - student_id: 学生ID
+      - student_name: 学生姓名
+      - class: 班级
+      - status: 状态
+      - total_score: 总分数
+    """
+    try:
+        from models import CourseSelection, Student, Course, Semester
+        from services.public_service import public_service
+
+        # 获取当前学期
+        current_semester = public_service.get_current_semester(db)
+        if not current_semester:
+            return StudentScoreListResponse(
+                code=200,
+                msg="",
+                scorelist=[]
+            )
+
+        # 查询当前学期的所有课程选择记录
+        score_records = db.query(
+            CourseSelection.course_id,
+            CourseSelection.student_id,
+            Student.student_name,
+            Student.class_,
+            CourseSelection.status,
+            CourseSelection.score
+        ).join(
+            Student, CourseSelection.student_id == Student.id
+        ).join(
+            Course, CourseSelection.course_id == Course.course_id
+        ).filter(
+            Course.semester_id == current_semester.semester_id
+        ).all()
+
+        # 构建分数列表
+        score_list = []
+        for record in score_records:
+            score_list.append(StudentScoreItem(
+                course_id=str(record.course_id),
+                student_id=str(record.student_id),
+                student_name=record.student_name or "",
+                class_=record.class_ or "",
+                status=str(record.status or 1),
+                total_score=record.score or 0
+            ))
+
+        return StudentScoreListResponse(
+            code=200,
+            msg="",
+            scorelist=score_list
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取学生分数失败: {str(e)}"
+        )
+
+# 教师专用题目列表接口
+@teacher_router.get("/problem/list", response_model=TeacherProblemListDocResponse, summary="获取所有题目信息")
+async def get_teacher_problem_list(
+    current_user: dict = Depends(get_current_teacher),
+    db: Session = Depends(get_db)
+):
+    """
+    获取所有题目列表
+
+    权限要求：需登录，仅教师角色可访问
+    认证方式：必须附带JWT令牌
+
+    返回：
+    - code: 状态码（200表示成功）
+    - msg: 消息（"查询成功"）
+    - data: 题目列表
+      - problem_id: 题目ID
+      - is_required: 是否为必做题（0/1）
+      - is_ordered: 是否有序（0/1）
+      - problem_content: 题目内容
+      - example_sql: 示例SQL
+    """
+    try:
+        # 使用教师服务获取所有题目
+        from services.teacher_service import teacher_service
+
+        result = teacher_service.get_all_problems(db=db)
+        return result
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取题目列表失败: {str(e)}"
+        )
+
+# 创建题目接口
+@teacher_router.post("/problem/create", response_model=ProblemCreateResponse, summary="创建题目")
+async def create_problem(
+    problem_data: ProblemCreateRequest,
+    current_user: dict = Depends(get_teacher_or_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    创建题目
+
+    权限要求：需登录，仅管理员、教师角色可访问
+    认证方式：必须附带JWT令牌
+
+    请求体：
+    - is_required: 是否为必做题（0/1）
+    - is_ordered: 是否有序（0/1）
+    - problem_content: 题目内容（必填）
+    - example_sql: 示例SQL（必填）
+    - schema_id: 数据库模式ID（可选）
+
+    返回：
+    - code: 状态码（200表示成功）
+    - msg: 消息（"题目创建成功"）
+    """
+    try:
+        result = teacher_service.create_problem(
+            teacher_id=current_user["id"],
+            problem_data=problem_data,
+            db=db
+        )
+
+        if result.code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.msg
+            )
+
+        return result
 
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"导出分数失败: {str(e)}"
+            detail=f"创建题目失败: {str(e)}"
         )
-
-# 题目和数据库模式相关接口已移至 /public 路径
-# 请使用 GET /public/problem/list 替代此接口
 
 # 数据库模式列表接口已移至 /public 路径
 # 请使用 GET /public/schemas 替代此接口
@@ -528,13 +679,13 @@ async def get_student_problem_stats(
     db: Session = Depends(get_db)
 ):
     """
-    根据传入的学生 ID 和题目 ID，返回每个学生在每个题目上的提交次数和正确次数
+    根据传入的学生ID和题目ID，返回每个学生在每个题目上的提交次数和正确次数
 
     需要教师身份的JWT认证令牌
 
     请求参数：
     - student_ids: 学生ID列表（学号）
-    - problem_ids: 题目编号列表
+    - problem_ids: 题目ID列表
 
     返回：
     - data: 学生题目统计数据列表，包含每个学生在每个题目上的：
@@ -553,20 +704,20 @@ async def get_student_problem_stats(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="学生ID列表不能为空"
             )
-
+        
         if not stats_request.problem_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="题目ID列表不能为空"
             )
 
-        # 转换problem_ids为整数（如果需要）
+        # 将字符串类型的题目ID转换为整数
         try:
-            problem_ids_int = [int(pid) for pid in stats_request.problem_ids]
+            problem_ids = [int(pid) for pid in stats_request.problem_ids]
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="题目ID格式错误，必须为数字"
+                detail="题目ID必须为数字"
             )
 
         # 构建结果列表
@@ -574,31 +725,38 @@ async def get_student_problem_stats(
 
         # 遍历每个学生和每个题目的组合
         for student_id in stats_request.student_ids:
-            for problem_id_str, problem_id_int in zip(stats_request.problem_ids, problem_ids_int):
-                # 查询该学生在该题目上的所有提交记录，关联Student表
-                submissions = db.query(AnswerRecord).join(
-                    Student, AnswerRecord.student_id == Student.id
-                ).filter(
-                    Student.student_id == student_id,
-                    AnswerRecord.problem_id == problem_id_int
+            # 获取学生内部ID
+            student = db.query(Student).filter(Student.student_id == student_id).first()
+            if not student:
+                continue
+                
+            for problem_id in problem_ids:
+                # 验证题目是否存在
+                problem_exists = db.query(Problem).filter(Problem.problem_id == problem_id).first()
+                if not problem_exists:
+                    continue
+                
+                # 查询该学生在该题目上的所有提交记录
+                submissions = db.query(AnswerRecord).filter(
+                    AnswerRecord.student_id == student.id,
+                    AnswerRecord.problem_id == problem_id
                 ).all()
 
                 # 统计各种类型的提交次数
                 submit_count = len(submissions)
-                correct_count = sum(1 for s in submissions if s.result_type == 0)  # 使用result_type字段
-                syntax_error_count = sum(1 for s in submissions if s.result_type == 1)  # 语法错误
-                result_error_count = sum(1 for s in submissions if s.result_type == 2)  # 结果错误
+                correct_count = sum(1 for s in submissions if s.result_type == 0)
+                syntax_error_count = sum(1 for s in submissions if s.result_type == 1)
+                result_error_count = sum(1 for s in submissions if s.result_type == 2)
 
-                # 只有当有提交记录时才添加到结果中
-                if submit_count > 0:
-                    result_data.append({
-                        "student_id": student_id,
-                        "problem_id": problem_id_str,
-                        "submit_count": submit_count,
-                        "correct_count": correct_count,
-                        "syntax_error_count": syntax_error_count,
-                        "result_error_count": result_error_count
-                    })
+                # 添加到结果中（即使没有提交记录也添加，显示为0）
+                result_data.append({
+                    "student_id": student.student_id,
+                    "problem_id": str(problem_id),
+                    "submit_count": submit_count,
+                    "correct_count": correct_count,
+                    "syntax_error_count": syntax_error_count,
+                    "result_error_count": result_error_count
+                })
 
         return StudentProblemStatsResponse(data=result_data)
 
@@ -608,6 +766,53 @@ async def get_student_problem_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"查询学生题目提交情况失败: {str(e)}"
+        )
+
+# 学生答题记录查询接口
+@teacher_router.post("/student/answer-records", response_model=StudentAnswerRecordsResponse, summary="查询学生答题记录")
+async def get_student_answer_records(
+    request: StudentAnswerRecordsRequest,
+    current_user: dict = Depends(get_current_teacher),
+    db: Session = Depends(get_db)
+):
+    """
+    根据传入的学期id，从选课表中获取学生范围，然后返回这些学生的答题记录
+
+    需要教师身份的JWT认证令牌
+
+    请求参数（JSON格式）：
+    - semester_ids: 学期ID列表（如：[1, 2]）
+
+    返回：
+    - data: 学生答题记录列表，包含：
+      - student_id: 学生学号
+      - problem_content: 题目内容
+      - result_type: 结果类型（0:正确，1:语法错误，2:结果错误）
+      - answer_content: 答案内容
+      - timestep: 提交时间
+    """
+    try:
+        # 验证输入参数
+        if not request.semester_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="学期ID列表不能为空"
+            )
+
+        # 调用服务层方法获取学生答题记录
+        result = teacher_service.get_student_answer_records(
+            semester_ids=request.semester_ids,
+            db=db
+        )
+
+        return StudentAnswerRecordsResponse(data=result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"查询学生答题记录失败: {str(e)}"
         )
 
 # 已删除: 获取学生信息接口 - 功能已整合到其他接口
@@ -804,81 +1009,7 @@ async def export_dataset(
         )
 
 # 导出指定学生成绩数据接口
-@teacher_router.post("/dataset/export-custom", summary="导出指定学生成绩数据")
-async def export_custom_student_scores(
-    request: StudentScoreExportRequest,
-    current_user: dict = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
-):
-    """
-    传入的学生数据导出为表格文件（XLSX）
 
-    需要教师身份的JWT认证令牌
-
-    请求体：
-    - students: 学生信息数组，包含学号、姓名、班级、课程ID、分数
-
-    返回：
-    - Excel文件流
-    """
-    try:
-        import pandas as pd
-        from io import BytesIO
-        from datetime import datetime
-
-        # 验证请求数据
-        if not request.students:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="学生数据不能为空"
-            )
-
-        # 构建导出数据
-        export_data = []
-        for student in request.students:
-            export_data.append({
-                "student_id": student.student_id,
-                "student_name": student.student_name,
-                "class": student.class_,
-                "course_id": student.course_id,
-                "score": student.score
-            })
-
-        # 生成文件名
-        current_date = datetime.now().strftime("%Y%m%d")
-        filename = f"score-export-{current_date}.xlsx"
-
-        # 创建DataFrame
-        df = pd.DataFrame(export_data)
-
-        # 重命名列名
-        df.columns = ['学号', '姓名', '班级', '课程号', '分数']
-
-        # 创建Excel文件
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='学生成绩')
-
-        output.seek(0)
-
-        return StreamingResponse(
-            BytesIO(output.getvalue()),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-
-    except ImportError:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="缺少pandas或openpyxl依赖，无法导出Excel格式"
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"导出学生成绩数据失败: {str(e)}"
-        )
 
 # 导出辅助函数已移至 teacher_service.py
 # 控制器现在通过服务层处理导出逻辑
@@ -926,7 +1057,7 @@ async def get_problem_detail(
         problem_data = ProblemDetailData(
             problem_id=problem.problem_id,
             is_required=problem.is_required or 0,
-            is_ordered=problem.is_orderd or 0,  # 注意数据库字段名的拼写
+            is_ordered=problem.is_ordered or 0,  # 注意数据库字段名的拼写
             problem_content=problem.problem_content or "",
             example_sql=problem.example_sql or ""
         )
@@ -988,7 +1119,7 @@ async def edit_problem(
         if edit_request.is_required is not None:
             problem.is_required = edit_request.is_required
         if edit_request.is_ordered is not None:
-            problem.is_orderd = edit_request.is_ordered  # 注意数据库字段名的拼写
+            problem.is_ordered = edit_request.is_ordered  # 注意数据库字段名的拼写
         if edit_request.problem_content is not None:
             problem.problem_content = edit_request.problem_content
         if edit_request.example_sql is not None:
@@ -1072,16 +1203,16 @@ async def create_database_schema(
     db: Session = Depends(get_db)
 ):
     """
-    根据HTML格式文本、数据库模式名称、SQL引擎和SQL文本创建数据库模式
+    根据HTML格式文本、数据库模式名称和SQL文本创建数据库模式
 
     需要教师身份的JWT认证令牌
 
     请求参数（JSON格式）：
-    - html_content: HTML格式文本（必须）
+    - schema_description: HTML格式文本描述（必须）
     - schema_name: 数据库模式名称（必须）
-    - sql_engine: SQL引擎类型（必须，如：mysql, postgresql, opengauss）
-    - sql_schema: 创建数据库模式时的名称（必须）
     - sql_file_content: SQL建表语句文本（必须）
+    - sql_schema: 创建数据库模式时的名称（必须）
+    - schema_author: 模式作者（必须）
 
     返回：
     - code: 状态码（200表示成功）
@@ -1089,7 +1220,7 @@ async def create_database_schema(
 
     执行流程：
     1. 判断此模式是否已经存在，如果存在则结束流程
-    2. 如果不存在，连接指定的SQL引擎
+    2. 如果不存在，连接PostgreSQL引擎
     3. 执行SQL文本中的建表语句
     4. 执行成功后将数据插入到database_schema表中
     """
@@ -1166,4 +1297,43 @@ async def execute_sql_query(
             msg=f"执行SQL查询失败: {str(e)}",
             columns=[],
             rows=[]
+        )
+
+@teacher_router.delete("/schemas/{schema_id}", response_model=OperationResponse, summary="删除数据库模式")
+async def delete_database_schema(
+    schema_id: int,
+    current_user: dict = Depends(get_current_teacher),
+    db: Session = Depends(get_db)
+):
+    """
+    删除数据库模式
+
+    需要管理员身份的JWT认证令牌
+
+    路径参数：
+    - schema_id: 数据库模式ID
+
+    注意：如果数据库模式有关联的题目，将无法删除
+    """
+    try:
+        success, message = admin_service.delete_database_schema(
+            schema_id=schema_id,
+            current_user=current_user,
+            db=db
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=message
+            )
+
+        return OperationResponse(success=success, message=message)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"删除数据库模式失败: {str(e)}"
         )

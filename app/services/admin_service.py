@@ -368,8 +368,7 @@ class AdminService:
     def delete_database_schema(self, schema_id: int, current_user: dict,
                               db: Session) -> Tuple[bool, str]:
         """删除数据库模式"""
-        # 验证管理员权限
-        self._verify_admin_role(current_user)
+
 
         try:
             schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == schema_id).first()
@@ -380,10 +379,30 @@ class AdminService:
             if hasattr(schema, 'problems') and schema.problems:
                 return False, "该数据库模式有关联的题目，无法删除"
 
+            # 先删除数据库中的模式（如果存在sql_schema）
+            if schema.sql_schema:
+                try:
+                    from services.database_engine_service import database_engine_service
+                    from sqlalchemy import text
+                    
+                    # 获取PostgreSQL引擎
+                    engine = database_engine_service.get_engine("postgresql")
+                    
+                    # 执行DROP SCHEMA CASCADE语句
+                    drop_sql = f"DROP SCHEMA IF EXISTS {schema.sql_schema} CASCADE"
+                    with engine.connect() as connection:
+                        connection.execute(text(drop_sql))
+                        connection.commit()
+                        
+                except Exception as drop_error:
+                    print(f"删除数据库模式时出错: {drop_error}")
+                    # 即使数据库删除失败，也继续删除记录
+
+            # 删除数据库记录
             db.delete(schema)
             db.commit()
 
-            return True, "数据库模式删除成功"
+            return True, "已删除此模式的所有表格，数据库模式删除成功！"
 
         except Exception as e:
             db.rollback()

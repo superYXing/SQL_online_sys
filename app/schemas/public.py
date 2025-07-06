@@ -104,14 +104,16 @@ class DatabaseSchemaPublicListResponse(BaseModel):
 
 class DatabaseSchemaListItem(BaseModel):
     """数据库模式列表项模型（新格式）"""
-    schema_name: Optional[str]
-    schema_description: Optional[str]
-    schema_author: Optional[str]
+    schema_id: int
+    schema_name: str
+    schema_description: str
+    schema_author: str
 
     class Config:
         from_attributes = True
         json_schema_extra = {
             "example": {
+                "schema_id": 1,
                 "schema_name": "ORACLE_HR",
                 "schema_description": "html_description",
                 "schema_author": "name"

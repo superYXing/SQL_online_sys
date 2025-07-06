@@ -626,41 +626,5 @@ async def update_database_schema(
             detail=f"更新数据库模式失败: {str(e)}"
         )
 
-@admin_router.delete("/schemas/{schema_id}", response_model=OperationResponse, summary="删除数据库模式")
-async def delete_database_schema(
-    schema_id: int,
-    current_user: dict = Depends(get_current_admin),
-    db: Session = Depends(get_db)
-):
-    """
-    删除数据库模式
-
-    需要管理员身份的JWT认证令牌
-
-    路径参数：
-    - schema_id: 数据库模式ID
-
-    注意：如果数据库模式有关联的题目，将无法删除
-    """
-    try:
-        success, message = admin_service.delete_database_schema(
-            schema_id=schema_id,
-            current_user=current_user,
-            db=db
-        )
-
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=message
-            )
-
-        return OperationResponse(success=success, message=message)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"删除数据库模式失败: {str(e)}"
-        )
+# 删除数据库模式接口已移动到 teacher_controller.py
+# 新路径: DELETE /teacher/schemas/{schema_id}
