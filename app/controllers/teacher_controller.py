@@ -20,7 +20,7 @@ from schemas.teacher import (
     ProblemDetailResponse, ProblemEditRequest, ProblemEditResponse,
     TeacherStudentListResponse,
     StudentProblemStatisticsResponse, StudentInfoResponse, StudentProfileNewResponse,
-    StudentProfileDocResponse, StudentDetailResponse, StudentScoreExportRequest,
+    StudentProfileDocResponse, StudentDetailResponse,
     ProblemDeleteResponse, StudentCourseAddRequest, StudentCourseAddResponse,
     SchemaCreateRequest, SchemaCreateResponse, SQLQueryRequest, SQLQueryResponse,
     ProblemCreateRequest, ProblemCreateResponse, StudentDetailInfo, StudentUpdateRequest, StudentUpdateResponse
