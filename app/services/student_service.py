@@ -226,6 +226,14 @@ class StudentService:
     def submit_answer(self, student_id: str, problem_id: int, answer_content: str, db: Session, engine_type: str = "mysql") -> Tuple[int, str, Optional[int]]:
         """提交答题结果"""
         try:
+            # SQL安全检查：防止学生提交危险的SQL语句
+            dangerous_keywords = ['DELETE', 'TRUNCATE', 'DROP', 'ALTER']
+            answer_upper = answer_content.upper().strip()
+            
+            for keyword in dangerous_keywords:
+                if keyword in answer_upper:
+                    return -1, f"禁止使用 {keyword} 语句，学生不能对数据库表进行更改操作", None
+            
             # 首先验证学生是否存在
             student = db.query(Student).filter(Student.student_id == student_id).first()
             if not student:

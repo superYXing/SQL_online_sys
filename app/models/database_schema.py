@@ -11,6 +11,7 @@ class DatabaseSchema(Base):
     schema_name = Column(Text, nullable=True)
     sql_schema = Column(Text, nullable=True, comment="数据库模式名称，用于USE语句")
     schema_author = Column(Text, nullable=True, comment="创建模式的教师姓名")
+    sql_table = Column(Text, nullable=True, comment="数据库建表语句")
 
     # 关系
     problems = relationship("Problem", back_populates="schema")

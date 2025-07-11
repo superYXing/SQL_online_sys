@@ -16,7 +16,7 @@ from .admin import (
 from .teacher import (
     TeacherProfileResponse, CourseInfo, TeacherCourseListResponse,
     StudentGradeInfo, CourseGradeResponse, StudentCreateRequest,
-    StudentCreateResponse, ImportFailDetail, StudentImportResponse,
+    StudentCreateResponse,
     ScoreCalculateRequest, StudentScoreInfo, ScoreUpdateResponse, ScoreListResponse
 )
 from .public import (
@@ -69,8 +69,6 @@ __all__ = [
     "CourseGradeResponse",
     "StudentCreateRequest",
     "StudentCreateResponse",
-    "ImportFailDetail",
-    "StudentImportResponse",
     "ScoreCalculateRequest",
     "StudentScoreInfo",
     "ScoreUpdateResponse",

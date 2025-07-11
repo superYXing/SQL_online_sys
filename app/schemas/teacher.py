@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -115,30 +115,28 @@ class StudentCourseItem(BaseModel):
             }
         }
 
-class StudentCourseAddRequest(BaseModel):
+class StudentCourseAddRequest(RootModel[List[StudentCourseItem]]):
     """添加学生选课信息请求模型（支持批量）"""
-    students: List[StudentCourseItem]
+    root: List[StudentCourseItem]
 
     class Config:
         json_schema_extra = {
-            "example": {
-                "students": [
-                    {
-                        "student_id": "20232251177",
-                        "student_name": "张三",
-                        "class_": "计算机科学与技术1班",
-                        "status": 0,
-                        "course_id": 10
-                    },
-                    {
-                        "student_id": "20234651182",
-                        "student_name": "李四",
-                        "class_": "计算机科学与技术1班",
-                        "status": 1,
-                        "course_id": 10
-                    }
-                ]
-            }
+            "example": [
+                {
+                    "student_id": "20232251177",
+                    "student_name": "张三",
+                    "class_": "计算机科学与技术1班",
+                    "status": 0,
+                    "course_id": 10
+                },
+                {
+                    "student_id": "20234651182",
+                    "student_name": "李四",
+                    "class_": "计算机科学与技术1班",
+                    "status": 1,
+                    "course_id": 10
+                }
+            ]
         }
 
 class StudentCourseAddResponse(BaseModel):
@@ -156,11 +154,16 @@ class StudentCourseAddResponse(BaseModel):
         }
 
 # 数据库模式相关模型
+class SQLFileContent(BaseModel):
+    """SQL文件内容模型"""
+    mysql_engine: str
+    postgresql_opengauss_engine: str
+
 class SchemaCreateRequest(BaseModel):
     """创建数据库模式请求模型"""
     schema_description: str  # HTML格式文本描述
     schema_name: str
-    sql_file_content: str  # SQL建表语句文本内容
+    sql_file_content: SQLFileContent  # SQL建表语句对象
     sql_schema: str
     schema_author: str  # 模式作者
 
@@ -169,7 +172,10 @@ class SchemaCreateRequest(BaseModel):
             "example": {
                 "schema_description": "<html><body><h1>test</h1></body></html>",
                 "schema_name": "test",
-                "sql_file_content": "select * from ...",
+                "sql_file_content": {
+                    "mysql_engine": "create table",
+                    "postgresql_opengauss_engine": "create table"
+                },
                 "sql_schema": "test",
                 "schema_author": "李师师"
             }
@@ -223,24 +229,7 @@ class SQLQueryResponse(BaseModel):
             }
         }
 
-class ImportFailDetail(BaseModel):
-    """导入失败详情模型"""
-    row: int
-    reason: str
 
-    class Config:
-        from_attributes = True
-
-class StudentImportResponse(BaseModel):
-    """学生批量导入响应模型"""
-    code: int = 200
-    msg: str
-    success_count: int
-    fail_count: int
-    fail_details: List[ImportFailDetail]
-
-    class Config:
-        from_attributes = True
 
 # 分数核算相关模型
 class ScoreCalculateRequest(BaseModel):

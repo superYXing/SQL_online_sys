@@ -179,7 +179,6 @@
             <h2>学生管理</h2>
             <div style="margin-bottom: 20px;">
                 <button class="btn" onclick="createStudent()">创建学生</button>
-                <button class="btn btn-success" onclick="importStudents()">批量导入</button>
             </div>
             <div class="table-container">
                 <table id="studentTable">
@@ -452,9 +451,7 @@
             alert('创建学生功能 - 调用 POST /teacher/students 接口');
         }
 
-        function importStudents() {
-            alert('批量导入功能 - 调用 POST /teacher/students/import 接口');
-        }
+
 
         function viewStudent(id) {
             alert(`查看学生 ${id} 的详细信息`);

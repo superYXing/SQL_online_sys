@@ -9,7 +9,7 @@ import io
 from models.base import get_db
 from schemas.teacher import (
     TeacherProfileResponse, TeacherCourseListResponse, CourseGradeResponse,
-    StudentCreateRequest, StudentCreateResponse, StudentImportResponse,
+    StudentCreateRequest, StudentCreateResponse,
     ScoreCalculateRequest, ScoreUpdateResponse, ScoreListResponse,
     TeacherProblemListResponse, TeacherSchemaListResponse, TeacherProblemListDocResponse, TeacherProblemItem,
     StudentScoreListResponse, StudentScoreItem, SchemaUpdateRequest, SchemaUpdateResponse,
@@ -118,7 +118,7 @@ async def add_student_course(
     try:
         success, message, response = teacher_service.add_student_course_batch(
             teacher_id=current_user["id"],
-            course_data_list=course_data.students,
+            course_data_list=course_data.root,
             db=db
         )
 
@@ -411,97 +411,80 @@ async def get_student_scores(
 
 
 # 修改数据库模式接口
-@teacher_router.put("/schema/update", response_model=SchemaUpdateResponse, summary="修改数据库模式")
-async def update_database_schema(
-    request: SchemaUpdateRequest,
-    current_user: dict = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
-):
-    """
-    根据html格式文本，数据库模式名称，sql引擎和sql建表文件和sql_schema修改数据库模式
+# @teacher_router.put("/schema/update", response_model=SchemaUpdateResponse, summary="修改数据库模式")
+# async def update_database_schema(
+#     request: SchemaUpdateRequest,
+#     current_user: dict = Depends(get_current_teacher),
+#     db: Session = Depends(get_db)
+# ):
+#     """
+#     根据html格式文本，数据库模式名称，sql引擎和sql建表文件和sql_schema修改数据库模式
+#
+#     权限：需登录，仅教师角色可访问
+#
+#     请求参数：
+#     - schema_id: 数据库模式ID
+#     - schema_description: html格式文本描述
+#     - schema_name: 数据库模式名称
+#     - sql_file_content: SQL建表语句文本内容（可选）
+#     - sql_schema: 创建数据库模式时的名称
+#     - schema_author: 模式作者
+#
+#     ⚠️ 重要提示：
+#     - sql_file_content 只能包含建表语句（CREATE TABLE、CREATE INDEX等）
+#     - 禁止使用修改删除语句（ALTER、DELETE、DROP、TRUNCATE等）
+#     - 更新时会完全重建数据库模式，请提供完整的建表语句
+#
+#     返回：
+#     - code: 状态码（200表示成功）
+#     - msg: 消息（"修改数据库模式成功"）
+#     """
+#     try:
+#         success, message, response = teacher_service.update_database_schema(
+#             teacher_id=current_user["id"],
+#             schema_data=request,
+#             db=db
+#         )
+#
+#         if not success:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail=message
+#             )
+#
+#         return response
+#
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=f"修改数据库模式失败: {str(e)}"
+#         )
 
-    权限：需登录，仅教师角色可访问
-
-    请求参数：
-    - schema_id: 数据库模式ID
-    - schema_description: html格式文本描述
-    - schema_name: 数据库模式名称
-    - sql_file_content: SQL建表语句文本内容（可选）
-    - sql_schema: 创建数据库模式时的名称
-    - schema_author: 模式作者
-
-    返回：
-    - code: 状态码（200表示成功）
-    - msg: 消息（"修改数据库模式成功"）
-    """
-    try:
-        from models import DatabaseSchema
-        from services.database_engine_service import database_engine_service
-
-        # 检查数据库模式是否存在
-        schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == request.schema_id).first()
-        if not schema:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="数据库模式不存在"
-            )
-
-        # 如果提供了SQL文件内容，则执行SQL更新
-        if request.sql_file_content and request.sql_file_content.strip():
-            try:
-                # 使用PostgreSQL引擎
-                sql_engine = 'postgresql'  # 默认使用postgresql
-                
-                # 检查引擎是否可用
-                if sql_engine not in database_engine_service.engines:
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail=f"数据库引擎 {sql_engine} 不可用"
-                    )
-                
-                engine = database_engine_service.engines[sql_engine]
-
-                # 执行SQL
-                with engine.connect() as connection:
-                    from sqlalchemy import text
-                    
-                    # 切换到指定的数据库/模式
-                    if sql_engine == "mysql":
-                        connection.execute(text(f"USE {request.sql_schema}"))
-                    elif sql_engine in ["postgresql", "opengauss"]:
-                        connection.execute(text(f"SET search_path TO {request.sql_schema}"))
-
-                    # 执行SQL内容
-                    connection.execute(text(request.sql_file_content))
-                    connection.commit()
-
-            except Exception as e:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"执行SQL失败: {str(e)}"
-                )
-
-        # 更新数据库模式记录
-        schema.schema_name = request.schema_name
-        schema.schema_discription = request.schema_description
-        schema.sql_schema = request.sql_schema
-        schema.schema_author = request.schema_author
-
-        db.commit()
-
-        return SchemaUpdateResponse(
-            code=200,
-            msg="修改数据库模式成功"
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"修改数据库模式失败: {str(e)}"
-        )
+# @teacher_router.get("/schema/sql-validation-rules", summary="获取SQL验证规则")
+# async def get_sql_validation_rules():
+#     """
+#     获取SQL语句验证规则说明
+#
+#     用于前端显示给用户的提示信息
+#
+#     返回：
+#     - validation_rules: 验证规则说明
+#     - allowed_keywords: 允许的关键词列表
+#     - forbidden_keywords: 禁止的关键词列表
+#     """
+#     from utils.sql_validator import SQLValidator
+#
+#     return {
+#         "code": 200,
+#         "msg": "获取验证规则成功",
+#         "data": {
+#             "validation_rules": SQLValidator.get_validation_message(),
+#             "allowed_keywords": SQLValidator.ALLOWED_KEYWORDS,
+#             "forbidden_keywords": SQLValidator.FORBIDDEN_KEYWORDS
+#         }
+#     }
 
 # 获取学生分数接口
 @teacher_router.get("/score", response_model=StudentScoreListResponse, summary="获取学生分数")
@@ -1225,11 +1208,11 @@ async def create_database_schema(
     4. 执行成功后将数据插入到database_schema表中
     """
     try:
-        # 验证SQL文本内容
-        if not schema_data.sql_file_content or not schema_data.sql_file_content.strip():
+        # 验证SQL文件内容对象
+        if not schema_data.sql_file_content:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="SQL文本内容不能为空"
+                detail="SQL文件内容不能为空"
             )
 
         success, message, response = teacher_service.create_database_schema(
@@ -1308,7 +1291,6 @@ async def delete_database_schema(
     """
     删除数据库模式
 
-    需要管理员身份的JWT认证令牌
 
     路径参数：
     - schema_id: 数据库模式ID

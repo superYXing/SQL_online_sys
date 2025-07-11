@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, Date
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, Date, String, func
+from sqlalchemy.orm import relationship, foreign
 from models.base import Base
 
 class DateRange(Base):
@@ -11,7 +11,9 @@ class DateRange(Base):
     end_date = Column(Date, nullable=True)
     
     # 关系
-    semesters = relationship("Semester", back_populates="date_range")
+    semesters = relationship("Semester",
+                           primaryjoin="func.cast(DateRange.date_id, String) == foreign(Semester.date_id)",
+                           back_populates="date_range")
     
     def __repr__(self):
         return f"<DateRange(id={self.date_id}, begin={self.begin_date}, end={self.end_date})>" 

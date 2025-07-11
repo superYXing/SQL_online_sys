@@ -34,8 +34,8 @@
               <h3><el-icon><DataAnalysis /></el-icon> 数据库模式</h3>
             </div>
             <div class="schema-list">
-              <div 
-                v-for="schema in schemaList" 
+              <div
+                v-for="schema in schemaList"
                 :key="schema.schema_name"
                 class="schema-item"
                 :class="{ active: selectedSchema === schema.schema_name }"
@@ -52,8 +52,8 @@
             <div class="problems-section">
               <h3><el-icon><Files /></el-icon> 可用题目列表</h3>
               <div class="problem-list">
-                <div 
-                  v-for="(problem, index) in currentProblems" 
+                <div
+                  v-for="(problem, index) in currentProblems"
                   :key="problem.problem_id"
                   class="problem-item"
                   @click="selectProblem(problem)"
@@ -72,7 +72,7 @@
               </div>
             </div>
           </div>
-          
+
           <!-- 右侧：数据库模式描述 -->
           <div class="right-panel" v-if="selectedSchema && !selectedProblem">
             <div class="schema-detail-page">
@@ -80,7 +80,7 @@
                 <h2>{{ selectedSchema }}</h2>
                 <p class="author">作者：{{ selectedSchemaInfo?.schema_author }}</p>
               </div>
-              
+
               <!-- 描述部分 -->
               <div class="schema-description" v-if="selectedSchemaInfo">
                 <h3><el-icon><CollectionTag /></el-icon> 模式描述</h3>
@@ -95,7 +95,7 @@
             <div class="back-button">
               <el-button @click="backToSchema" icon="ArrowLeft">返回模式</el-button>
             </div>
-            
+
             <!-- 题目信息 -->
             <div class="problem-detail">
               <div class="problem-header">
@@ -141,8 +141,14 @@
                 />
               </div>
               <div class="editor-actions">
-                <el-button type="primary" @click="submitSQL" :loading="submitting">提交</el-button>
-                <el-button @click="clearSQL">清空</el-button>
+                <!-- 提交结果消息显示区域 -->
+                <div v-if="submitMessage" class="submit-message-inline" :class="`submit-message-${submitMessageType}`">
+                  {{ submitMessage }}
+                </div>
+                <div class="action-buttons">
+                  <el-button type="primary" @click="submitSQL" :loading="submitting">提交</el-button>
+                  <el-button @click="clearSQL">清空</el-button>
+                </div>
               </div>
             </div>
 
@@ -153,15 +159,15 @@
                 暂无答题记录
               </div>
               <div v-else class="records-list">
-                <div 
-                  v-for="record in answerRecords" 
+                <div
+                  v-for="record in answerRecords"
                   :key="record.answer_record_id"
                   class="record-item"
                 >
                   <div class="record-header">
                     <span class="record-id">#{{ record.answer_record_id }}</span>
                     <span class="record-time">{{ record.timestep }}</span>
-                    <span 
+                    <span
                       class="record-status"
                       :class="getStatusClass(record.result_type)"
                     >
@@ -172,11 +178,10 @@
                     <code>{{ record.answer_content }}</code>
                   </div>
                   <div class="record-actions">
-                    <el-button 
-                      type="primary" 
-                      size="small" 
+                    <el-button
+                      type="primary"
+                      size="small"
                       @click="analyzeWithAI(record)"
-                      :loading="record.aiAnalyzing"
                       class="ai-analyze-btn"
                     >
                       <el-icon><DataAnalysis /></el-icon>
@@ -248,6 +253,39 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- AI分析对话框 -->
+    <el-dialog
+      v-model="aiDialogVisible"
+      title="AI分析结果"
+      width="600px"
+      :close-on-click-modal="false"
+      class="modern-dialog ai-dialog"
+    >
+      <div class="ai-dialog-content">
+        <div v-if="aiAnalyzing" class="ai-loading">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          <span>AI正在分析中，请稍候...</span>
+        </div>
+        <div class="ai-result">
+          <div class="ai-result-content">
+            {{ aiAnalysisResult }}
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="closeAiDialog">关闭</el-button>
+          <el-button 
+            v-if="!aiAnalyzing && aiAnalysisResult && currentAnalyzingRecord" 
+            type="primary" 
+            @click="currentAnalyzingRecord.aiAnalysis = aiAnalysisResult; closeAiDialog()"
+          >
+            保存到记录
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -255,12 +293,12 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from '@/utils/axios'
-import { 
-  ElMessage, 
-  ElMessageBox, 
-  ElDropdown, 
-  ElDropdownMenu, 
-  ElDropdownItem, 
+import {
+  ElMessage,
+  ElMessageBox,
+  ElDropdown,
+  ElDropdownMenu,
+  ElDropdownItem,
   ElIcon,
   ElDialog,
   ElForm,
@@ -272,7 +310,7 @@ import {
   type FormInstance,
   type FormRules
 } from 'element-plus'
-import { ArrowDown, ArrowLeft, DataAnalysis, Files, CollectionTag } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowLeft, DataAnalysis, Files, CollectionTag, Loading, SuccessFilled, CircleCloseFilled, WarningFilled, Close } from '@element-plus/icons-vue'
 import Codemirror from 'codemirror-editor-vue3'
 import 'codemirror/mode/sql/sql.js'
 import 'codemirror/theme/dracula.css'
@@ -314,6 +352,10 @@ const submitting = ref(false)
 // 答题记录
 const answerRecords = ref<any[]>([])
 
+// 提交结果消息
+const submitMessage = ref('')
+const submitMessageType = ref<'success' | 'error' | 'warning' | ''>('')
+
 // 密码修改相关
 const passwordDialogVisible = ref(false)
 const passwordLoading = ref(false)
@@ -323,6 +365,12 @@ const passwordForm = ref({
   newPassword: '',
   confirmPassword: ''
 })
+
+// AI分析对话框相关
+const aiDialogVisible = ref(false)
+const aiAnalyzing = ref(false)
+const aiAnalysisResult = ref('')
+const currentAnalyzingRecord = ref<any>(null)
 
 // 密码验证规则
 const validateConfirmPassword = (rule: any, value: string, callback: any) => {
@@ -398,7 +446,7 @@ const selectSchema = (schema: any) => {
   selectedSchemaInfo.value = schema
   selectedProblem.value = null
   answerRecords.value = []
-  
+
   // 找到对应的题目列表
   const schemaData = allProblemsData.value.find(item => item.schema_name === schema.schema_name)
   if (schemaData && schemaData.problems) {
@@ -461,12 +509,12 @@ const submitSQL = async () => {
     ElMessage.warning('请输入SQL语句')
     return
   }
-  
+
   if (!selectedProblem.value) {
     ElMessage.warning('请选择题目')
     return
   }
-  
+
   try {
     submitting.value = true
     const response = await axios.post('/student/answer/submit', {
@@ -474,18 +522,24 @@ const submitSQL = async () => {
       answer_content: sqlCode.value,
       engine_type: selectedEngine.value
     })
-    
+
     if (response.data) {
       const { resulte_type, message } = response.data
       if (resulte_type === 0) {
+        submitMessage.value = message || 'SQL提交成功，答案正确！'
+        submitMessageType.value = 'success'
         ElMessage.success(message || 'SQL提交成功，答案正确！')
       } else if (resulte_type === 1) {
+        submitMessage.value = message || 'SQL语法错误'
+        submitMessageType.value = 'error'
         ElMessage.error(message || 'SQL语法错误')
       } else if (resulte_type === 2) {
+        submitMessage.value = message || 'SQL结果错误'
+        submitMessageType.value = 'warning'
         ElMessage.warning(message || 'SQL结果错误')
       }
     }
-    
+
     // 重新获取答题记录
     await fetchAnswerRecords(selectedProblem.value.problem_id)
   } catch (error) {
@@ -526,34 +580,100 @@ const getStatusText = (resultType: number) => {
   }
 }
 
-// AI分析功能
+// AI分析功能（流式输出）
 const analyzeWithAI = async (record: any) => {
   if (!selectedProblem.value) {
     ElMessage.warning('请选择题目')
     return
   }
-  
+
+  // 打开对话框并设置初始状态
+  currentAnalyzingRecord.value = record
+  aiDialogVisible.value = true
+  aiAnalyzing.value = true
+  aiAnalysisResult.value = '正在连接AI服务，请稍候...'
+
   try {
-    // 设置加载状态
-    record.aiAnalyzing = true
-    
-    const response = await axios.post('/student/answer/ai-analyze', {
-      problem_id: selectedProblem.value.problem_id,
-      answer_content: record.answer_content
-    })
-    
-    if (response.data && response.data.ai_content) {
-      record.aiAnalysis = response.data.ai_content
-      ElMessage.success('AI分析完成')
-    } else {
-      ElMessage.error('AI分析失败')
+    // 获取token
+    const token = localStorage.getItem('token')
+    if (!token) {
+      ElMessage.error('请先登录')
+      aiDialogVisible.value = false
+      return
     }
+
+    // 使用fetch进行流式请求
+    const response = await fetch('http://wyaaa.gnway.cc:8000/student/answer/ai-analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        problem_id: selectedProblem.value.problem_id,
+        answer_content: record.answer_content
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    // 处理流式响应
+    const reader = response.body?.getReader()
+    const decoder = new TextDecoder()
+
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+
+              if (data.type === 'start') {
+                // 开始分析
+                aiAnalysisResult.value = data.message || '开始AI分析...'
+              } else if (data.type === 'content') {
+                // 追加内容
+                aiAnalysisResult.value += data.content
+              } else if (data.type === 'error') {
+                // 错误处理
+                aiAnalysisResult.value = data.message || 'AI分析失败'
+                ElMessage.error('AI分析失败')
+              } else if (data.type === 'done') {
+                // 分析完成
+                aiAnalyzing.value = false
+                // 将结果保存到记录中
+                record.aiAnalysis = aiAnalysisResult.value
+                ElMessage.success('AI分析完成')
+              }
+            } catch (e) {
+              // 忽略JSON解析错误
+              console.warn('解析流式数据失败:', e)
+            }
+          }
+        }
+      }
+    }
+
   } catch (error) {
     console.error('AI分析失败:', error)
+    aiAnalysisResult.value = 'AI分析失败，请稍后重试'
+    aiAnalyzing.value = false
     ElMessage.error('AI分析失败，请稍后重试')
-  } finally {
-    record.aiAnalyzing = false
   }
+}
+
+// 关闭AI分析对话框
+const closeAiDialog = () => {
+  aiDialogVisible.value = false
+  currentAnalyzingRecord.value = null
 }
 
 // 导航方法
@@ -581,16 +701,16 @@ const handleCommand = (command: string) => {
 // 修改密码
 const changePassword = async () => {
   if (!passwordFormRef.value) return
-  
+
   try {
     await passwordFormRef.value.validate()
     passwordLoading.value = true
-    
+
     await axios.put('/auth/password', {
       old_password: passwordForm.value.oldPassword,
       new_password: passwordForm.value.newPassword
     })
-    
+
     ElMessage.success('密码修改成功')
     passwordDialogVisible.value = false
     resetPasswordForm()
@@ -626,17 +746,17 @@ const handleLogout = async () => {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    
+
     try {
       await axios.post('/auth/logout')
     } catch (error) {
       console.warn('登出接口调用失败，但仍然清除本地token:', error)
     }
-    
+
     // 清除本地存储
     localStorage.removeItem('token')
     localStorage.removeItem('userInfo')
-    
+
     ElMessage.success('退出登录成功')
     router.push('/login')
   } catch (error) {
@@ -662,6 +782,54 @@ const resetPasswordForm = () => {
   background-color: #f0f5ff;
   border-bottom: 1px solid #d9ecff;
   padding: 16px 24px;
+}
+
+/* AI分析对话框样式 */
+.ai-dialog .el-dialog__header {
+  background-color: #f0f9ff;
+  border-bottom: 1px solid #bae6fd;
+}
+
+.ai-dialog-content {
+  min-height: 200px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.ai-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #409eff;
+  font-size: 16px;
+}
+
+.ai-loading .el-icon {
+  margin-right: 8px;
+  font-size: 20px;
+}
+
+.ai-result {
+  padding: 20px;
+}
+
+.ai-result-content {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  font-family: 'Courier New', monospace;
+  color: #334155;
+  min-height: 100px;
+}
+
+.ai-result-content:empty::before {
+  content: '等待AI分析结果...';
+  color: #94a3b8;
+  font-style: italic;
 }
 
 .modern-dialog .el-dialog__title {
@@ -1207,6 +1375,46 @@ const resetPasswordForm = () => {
   border-radius: 8px;
 }
 
+/* 编辑器操作区域 */
+.editor-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+/* 内联提交结果消息 */
+.submit-message-inline {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* 成功消息样式 */
+.submit-message-success {
+  color: #67c23a;
+}
+
+/* 错误消息样式 */
+.submit-message-error {
+  color: #f56c6c;
+}
+
+/* 警告消息样式 */
+.submit-message-warning {
+  color: #e6a23c;
+}
+
 .editor-header {
   display: flex;
   justify-content: space-between;
@@ -1228,17 +1436,13 @@ const resetPasswordForm = () => {
   font-family: 'Courier New', monospace;
 }
 
-.editor-actions {
-  margin-top: 16px;
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-}
+
 
 /* 答题记录 */
 .answer-records {
   flex: 1;
   overflow-y: auto;
+  min-height: 360px; /* 原来300px增加20%: 300px * 1.2 = 360px */
 }
 
 .answer-records h4 {
@@ -1374,11 +1578,11 @@ const resetPasswordForm = () => {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto 1fr;
   }
-  
+
   .nav-buttons {
     display: none;
   }
-  
+
   .left-panel,
   .middle-panel {
     max-height: 300px;
@@ -1389,11 +1593,11 @@ const resetPasswordForm = () => {
   .header {
     padding: 0 10px;
   }
-  
+
   .right-panel {
     padding: 10px;
   }
-  
+
   .problem-header {
     flex-direction: column;
     align-items: flex-start;

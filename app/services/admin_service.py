@@ -1,6 +1,6 @@
 from typing import Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func, String
 from fastapi import HTTPException, status
 from models import Semester, DateRange, DatabaseSchema
 from schemas.admin import (
@@ -37,12 +37,12 @@ class AdminService:
                 return False, "学期不存在", None
             
             # 查找对应的日期范围记录
-            date_range = db.query(DateRange).filter(DateRange.date_id == semester.date_id).first()
+            date_range = db.query(DateRange).filter(func.cast(DateRange.date_id, String) == semester.date_id).first()
             if not date_range:
                 return False, "学期对应的日期范围不存在", None
             
             # 检查是否与其他学期时间冲突
-            conflicting_semesters = db.query(Semester).join(DateRange).filter(
+            conflicting_semesters = db.query(Semester).join(DateRange, Semester.date_id == func.cast(DateRange.date_id, String)).filter(
                 and_(
                     Semester.semester_id != semester_id,  # 排除当前学期
                     # 检查时间重叠：新时间段与现有时间段有交集
@@ -85,7 +85,7 @@ class AdminService:
         try:
             # 查询学期及其日期范围信息
             result = db.query(Semester, DateRange).join(
-                DateRange, Semester.date_id == DateRange.date_id
+                DateRange, Semester.date_id == func.cast(DateRange.date_id, String)
             ).filter(Semester.semester_id == semester_id).first()
             
             if not result:
@@ -118,7 +118,7 @@ class AdminService:
                 return False, "开始日期必须早于结束日期", None
 
             # 检查是否与其他学期时间冲突
-            conflicting_semesters = db.query(Semester).join(DateRange).filter(
+            conflicting_semesters = db.query(Semester).join(DateRange, Semester.date_id == func.cast(DateRange.date_id, String)).filter(
                 and_(
                     DateRange.begin_date < end_date,
                     DateRange.end_date > begin_date
@@ -169,7 +169,7 @@ class AdminService:
         try:
             # 查询所有学期及其日期范围信息
             results = db.query(Semester, DateRange).join(
-                DateRange, Semester.date_id == DateRange.date_id
+                DateRange, Semester.date_id == func.cast(DateRange.date_id, String)
             ).all()
 
             semester_list = []
@@ -207,7 +207,7 @@ class AdminService:
             #     return False, "该学期有关联的课程，无法删除"
 
             # 删除关联的日期范围
-            date_range = db.query(DateRange).filter(DateRange.date_id == semester.date_id).first()
+            date_range = db.query(DateRange).filter(func.cast(DateRange.date_id, String) == semester.date_id).first()
             if date_range:
                 db.delete(date_range)
 
@@ -367,8 +367,9 @@ class AdminService:
 
     def delete_database_schema(self, schema_id: int, current_user: dict,
                               db: Session) -> Tuple[bool, str]:
-        """删除数据库模式"""
-
+        """删除数据库模式（同时删除三个数据库引擎的模式和表格）"""
+        # 验证管理员权限
+        self._verify_admin_role(current_user)
 
         try:
             schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == schema_id).first()
@@ -381,22 +382,81 @@ class AdminService:
 
             # 先删除数据库中的模式（如果存在sql_schema）
             if schema.sql_schema:
+                from services.database_engine_service import database_engine_service
+
+                # 删除MySQL模式
+                mysql_success = False
+                mysql_error_msg = ""
                 try:
-                    from services.database_engine_service import database_engine_service
-                    from sqlalchemy import text
-                    
-                    # 获取PostgreSQL引擎
-                    engine = database_engine_service.get_engine("postgresql")
-                    
-                    # 执行DROP SCHEMA CASCADE语句
-                    drop_sql = f"DROP SCHEMA IF EXISTS {schema.sql_schema} CASCADE"
-                    with engine.connect() as connection:
-                        connection.execute(text(drop_sql))
-                        connection.commit()
-                        
-                except Exception as drop_error:
-                    print(f"删除数据库模式时出错: {drop_error}")
-                    # 即使数据库删除失败，也继续删除记录
+                    mysql_drop_sql = f"DROP SCHEMA IF EXISTS {schema.sql_schema};"
+                    mysql_success, mysql_error_msg, _ = database_engine_service.execute_sql(
+                        sql=mysql_drop_sql,
+                        engine_type="mysql"
+                    )
+                    if mysql_success:
+                        print("MySQL模式删除成功")
+                    else:
+                        print(f"MySQL模式删除失败: {mysql_error_msg}")
+                except Exception as e:
+                    mysql_error_msg = f"MySQL删除异常: {str(e)}"
+                    print(mysql_error_msg)
+
+                # 删除PostgreSQL模式
+                postgresql_success = False
+                postgresql_error_msg = ""
+                try:
+                    postgresql_drop_sql = f"DROP SCHEMA IF EXISTS {schema.sql_schema} CASCADE;"
+                    postgresql_success, postgresql_error_msg, _ = database_engine_service.execute_sql(
+                        sql=postgresql_drop_sql,
+                        engine_type="postgresql"
+                    )
+                    if postgresql_success:
+                        print("PostgreSQL模式删除成功")
+                    else:
+                        print(f"PostgreSQL模式删除失败: {postgresql_error_msg}")
+                except Exception as e:
+                    postgresql_error_msg = f"PostgreSQL删除异常: {str(e)}"
+                    print(postgresql_error_msg)
+
+                # 删除OpenGauss模式
+                opengauss_success = False
+                opengauss_error_msg = ""
+                try:
+                    opengauss_drop_sql = f"DROP SCHEMA IF EXISTS {schema.sql_schema} CASCADE;"
+                    opengauss_success, opengauss_error_msg, _ = database_engine_service.execute_sql(
+                        sql=opengauss_drop_sql,
+                        engine_type="opengauss"
+                    )
+                    if opengauss_success:
+                        print("OpenGauss模式删除成功")
+                    else:
+                        print(f"OpenGauss模式删除失败: {opengauss_error_msg}")
+                except Exception as e:
+                    opengauss_error_msg = f"OpenGauss删除异常: {str(e)}"
+                    print(opengauss_error_msg)
+
+                # 检查删除结果 - 必须全部删除成功
+                success_count = 0
+                error_messages = []
+
+                if mysql_success:
+                    success_count += 1
+                else:
+                    error_messages.append(f"MySQL错误: {mysql_error_msg}")
+
+                if postgresql_success:
+                    success_count += 1
+                else:
+                    error_messages.append(f"PostgreSQL错误: {postgresql_error_msg}")
+
+                if opengauss_success:
+                    success_count += 1
+                else:
+                    error_messages.append(f"OpenGauss错误: {opengauss_error_msg}")
+
+                # 如果不是全部成功，返回错误
+                if success_count != 3:
+                    return False, f"数据库模式删除失败，必须全部删除成功: {'; '.join(error_messages)}"
 
             # 删除数据库记录
             db.delete(schema)

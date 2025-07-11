@@ -7,77 +7,26 @@ from models import (
 )
 from schemas.teacher import (
     TeacherProfileResponse, StudentCreateRequest,
-    StudentCreateResponse, ImportFailDetail, StudentImportResponse,
+    StudentCreateResponse,
     ScoreCalculateRequest, StudentScoreInfo, ScoreUpdateResponse, ScoreListResponse,
     TeacherStudentInfo, TeacherStudentListResponse,
-    StudentInfoResponse, StudentProfileNewResponse,
+    StudentInfoResponse, StudentProfileNewResponse, StudentProfileDocResponse,
     StudentCourseAddRequest, StudentCourseAddResponse, StudentCourseItem,
-    SchemaCreateRequest, SchemaCreateResponse, SQLQueryRequest, SQLQueryResponse,
+    SchemaCreateRequest, SchemaCreateResponse, SchemaUpdateRequest, SchemaUpdateResponse,
+    SQLQueryRequest, SQLQueryResponse,
     ProblemCreateRequest, ProblemCreateResponse
 )
 # 已删除无用导入: CourseInfo, TeacherCourseListResponse, StudentGradeInfo, CourseGradeResponse, ProblemStatisticsResponse, DashboardMatrixResponse
 from datetime import datetime
-import pandas as pd
-import io
 import json
+import os
+import psycopg2
 from services.public_service import public_service
 
 class TeacherService:
     """教师服务类"""
 
-    def _read_file_content(self, file_content: bytes) -> pd.DataFrame:
-        """
-        智能读取文件内容，支持Excel和CSV格式
-        """
-        # 检查文件头部字节来判断文件类型
-        file_header = file_content[:8]
 
-        # Excel文件的魔数标识
-        xlsx_signature = b'\x50\x4b\x03\x04'  # ZIP文件头（.xlsx是ZIP格式）
-        xls_signature = b'\xd0\xcf\x11\xe0'   # OLE文件头（.xls是OLE格式）
-
-        try:
-            # 尝试作为Excel文件读取
-            if file_header.startswith(xlsx_signature):
-                # .xlsx文件
-                return pd.read_excel(io.BytesIO(file_content), engine='openpyxl')
-            elif file_header.startswith(xls_signature):
-                # .xls文件
-                return pd.read_excel(io.BytesIO(file_content), engine='xlrd')
-            else:
-                # 可能是CSV文件或其他文本格式，尝试多种编码
-                encodings = ['utf-8', 'gbk', 'gb2312', 'utf-8-sig']
-
-                for encoding in encodings:
-                    try:
-                        # 尝试作为CSV读取
-                        content_str = file_content.decode(encoding)
-
-                        # 检测分隔符
-                        if '\t' in content_str:
-                            separator = '\t'
-                        elif ',' in content_str:
-                            separator = ','
-                        else:
-                            separator = ','
-
-                        df = pd.read_csv(io.StringIO(content_str), sep=separator)
-
-                        # 验证是否成功读取到数据
-                        if len(df) > 0 and len(df.columns) >= 4:
-                            return df
-
-                    except (UnicodeDecodeError, pd.errors.EmptyDataError):
-                        continue
-
-                # 如果所有方法都失败，最后尝试强制使用Excel引擎
-                try:
-                    return pd.read_excel(io.BytesIO(file_content), engine='openpyxl')
-                except Exception:
-                    return pd.read_excel(io.BytesIO(file_content), engine='xlrd')
-
-        except Exception as e:
-            raise Exception(f"无法读取文件内容。请确保文件是有效的Excel文件(.xlsx/.xls)或CSV文件。错误详情: {str(e)}")
 
     
     def get_teacher_profile(self, teacher_id: str, db: Session) -> Optional[TeacherProfileResponse]:
@@ -154,88 +103,6 @@ class TeacherService:
             print(f"创建学生失败: {e}")
             return False, f"创建失败: {str(e)}", None
 
-    def add_student_course(self, teacher_id: str, course_data: StudentCourseAddRequest,
-                          db: Session) -> Tuple[bool, str, Optional[StudentCourseAddResponse]]:
-        """添加学生选课信息"""
-        try:
-            # 验证教师是否存在
-            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
-            if not teacher:
-                return False, "教师不存在", None
-
-            # 验证课程是否存在
-            course = db.query(Course).filter(Course.course_id == course_data.course_id).first()
-            if not course:
-                return False, f"课程ID {course_data.course_id} 不存在", None
-
-            # 获取当前学期ID
-            current_semester = public_service.get_current_semester(db)
-            if not current_semester:
-                return False, "无法获取当前学期信息", None
-
-            # 检查学生是否已存在
-            existing_student = db.query(Student).filter(
-                Student.student_id == course_data.student_id
-            ).first()
-
-            if existing_student:
-                # 学生已存在，检查是否已经选择了该课程
-                existing_selection = db.query(CourseSelection).filter(
-                    CourseSelection.student_id == existing_student.id,
-                    CourseSelection.course_id == course_data.course_id,
-                    CourseSelection.semester_id == current_semester.semester_id
-                ).first()
-
-                if existing_selection:
-                    return False, f"学生 {course_data.student_id} 已经选择了课程 {course_data.course_id}", None
-
-                # 创建选课记录
-                new_selection = CourseSelection(
-                    student_id=existing_student.id,
-                    course_id=course_data.course_id,
-                    status=course_data.status,
-                    semester_id=current_semester.semester_id,
-                    score=0  # 默认分数为0
-                )
-
-                db.add(new_selection)
-                db.commit()
-
-                response = StudentCourseAddResponse(code=200, msg="添加")
-                return True, "学生选课信息添加成功", response
-
-            else:
-                # 学生不存在，先创建学生
-                new_student = Student(
-                    student_id=course_data.student_id,
-                    student_name=course_data.student_name,
-                    class_=course_data.class_,
-                    student_password="default@password"  # 默认密码
-                )
-
-                db.add(new_student)
-                db.flush()  # 获取新学生的ID
-
-                # 创建选课记录
-                new_selection = CourseSelection(
-                    student_id=new_student.id,
-                    course_id=course_data.course_id,
-                    status=course_data.status,
-                    semester_id=current_semester.semester_id,
-                    score=0  # 默认分数为0
-                )
-
-                db.add(new_selection)
-                db.commit()
-
-                response = StudentCourseAddResponse(code=200, msg="添加")
-                return True, "学生创建并选课成功", response
-
-        except Exception as e:
-            db.rollback()
-            print(f"添加学生选课信息失败: {e}")
-            return False, f"添加失败: {str(e)}", None
-
     def add_student_course_batch(self, teacher_id: str, course_data_list: List[StudentCourseItem],
                                 db: Session) -> Tuple[bool, str, Optional[StudentCourseAddResponse]]:
         """批量添加学生选课信息"""
@@ -253,16 +120,15 @@ class TeacherService:
 
             success_count = 0
             fail_count = 0
-            error_messages = []
+            fail_details = []
 
-            # 批量处理每个学生的选课信息
             for course_data in course_data_list:
                 try:
                     # 验证课程是否存在
                     course = db.query(Course).filter(Course.course_id == course_data.course_id).first()
                     if not course:
                         fail_count += 1
-                        error_messages.append(f"课程ID {course_data.course_id} 不存在")
+                        fail_details.append(f"学生 {course_data.student_id}: 课程ID {course_data.course_id} 不存在")
                         continue
 
                     # 检查学生是否已存在
@@ -280,7 +146,7 @@ class TeacherService:
 
                         if existing_selection:
                             fail_count += 1
-                            error_messages.append(f"学生 {course_data.student_id} 已经选择了课程 {course_data.course_id}")
+                            fail_details.append(f"学生 {course_data.student_id} 已经选择了课程 {course_data.course_id}")
                             continue
 
                         # 创建选课记录
@@ -321,16 +187,16 @@ class TeacherService:
 
                 except Exception as e:
                     fail_count += 1
-                    error_messages.append(f"处理学生 {course_data.student_id} 时出错: {str(e)}")
+                    fail_details.append(f"学生 {course_data.student_id}: {str(e)}")
 
             # 提交事务
             if success_count > 0:
                 db.commit()
-                
+
             if fail_count > 0:
-                message = f"批量添加完成，成功 {success_count} 条，失败 {fail_count} 条。错误详情: {'; '.join(error_messages[:5])}"  # 只显示前5个错误
+                message = f"批量添加完成，成功 {success_count} 条，失败 {fail_count} 条。失败详情: {'; '.join(fail_details)}"
             else:
-                message = f"批量添加成功，共处理 {success_count} 条记录"
+                message = f"批量添加成功，共添加 {success_count} 条学生选课信息"
 
             response = StudentCourseAddResponse(code=200, msg="添加成功")
             return True, message, response
@@ -340,118 +206,9 @@ class TeacherService:
             print(f"批量添加学生选课信息失败: {e}")
             return False, f"批量添加失败: {str(e)}", None
 
-    def import_students_from_excel(self, teacher_id: str, file_content: bytes,
-                                  db: Session) -> StudentImportResponse:
-        """从Excel文件批量导入学生"""
-        try:
-            # 验证教师是否存在
-            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
-            if not teacher:
-                return StudentImportResponse(
-                    code=400,
-                    msg="教师不存在",
-                    success_count=0,
-                    fail_count=0,
-                    fail_details=[]
-                )
 
-            # 读取文件内容
-            try:
-                df = self._read_file_content(file_content)
-            except Exception as e:
-                return StudentImportResponse(
-                    code=400,
-                    msg=f"文件读取失败: {str(e)}",
-                    success_count=0,
-                    fail_count=0,
-                    fail_details=[]
-                )
 
-            # 验证必需的列
-            required_columns = ['学号', '姓名', '班级', '密码']
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
-                return StudentImportResponse(
-                    code=400,
-                    msg=f"Excel文件缺少必需的列: {', '.join(missing_columns)}",
-                    success_count=0,
-                    fail_count=0,
-                    fail_details=[]
-                )
 
-            success_count = 0
-            fail_count = 0
-            fail_details = []
-
-            # 逐行处理学生数据
-            for index, row in df.iterrows():
-                try:
-                    student_id = str(row['学号']).strip()
-                    student_name = str(row['姓名']).strip()
-                    class_ = str(row['班级']).strip()
-                    password = str(row['密码']).strip()
-
-                    # 验证数据
-                    if not student_id or not student_name or not class_ or not password:
-                        fail_count += 1
-                        fail_details.append(ImportFailDetail(
-                            row=index + 2,  # Excel行号从2开始（包含表头）
-                            reason="数据不完整，请检查学号、姓名、班级、密码是否都已填写"
-                        ))
-                        continue
-
-                    # 检查学生ID是否已存在
-                    existing_student = db.query(Student).filter(
-                        Student.student_id == student_id
-                    ).first()
-                    if existing_student:
-                        fail_count += 1
-                        fail_details.append(ImportFailDetail(
-                            row=index + 2,
-                            reason=f"学生ID {student_id} 已存在"
-                        ))
-                        continue
-
-                    # 创建学生
-                    new_student = Student(
-                        student_id=student_id,
-                        student_name=student_name,
-                        class_=class_,
-                        student_password=password
-                    )
-
-                    db.add(new_student)
-                    success_count += 1
-
-                except Exception as e:
-                    fail_count += 1
-                    fail_details.append(ImportFailDetail(
-                        row=index + 2,
-                        reason=f"处理数据时出错: {str(e)}"
-                    ))
-
-            # 提交事务
-            if success_count > 0:
-                db.commit()
-
-            return StudentImportResponse(
-                code=200,
-                msg=f"导入完成，成功 {success_count} 条，失败 {fail_count} 条",
-                success_count=success_count,
-                fail_count=fail_count,
-                fail_details=fail_details
-            )
-
-        except Exception as e:
-            db.rollback()
-            print(f"批量导入学生失败: {e}")
-            return StudentImportResponse(
-                code=500,
-                msg=f"导入失败: {str(e)}",
-                success_count=0,
-                fail_count=0,
-                fail_details=[]
-            )
 
     def calculate_scores(self, teacher_id: str, problem_ids: List[int],
                         db: Session) -> ScoreUpdateResponse:
@@ -1037,6 +794,114 @@ class TeacherService:
                 msg=f"创建题目失败: {str(e)}"
             )
 
+    def update_database_schema(self, teacher_id: str, schema_data: SchemaUpdateRequest,
+                              db: Session) -> Tuple[bool, str, Optional[SchemaUpdateResponse]]:
+        """更新数据库模式"""
+        try:
+            # 验证教师是否存在
+            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
+            if not teacher:
+                return False, "教师不存在", None
+
+            # 检查数据库模式是否存在
+            schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == schema_data.schema_id).first()
+            if not schema:
+                return False, "数据库模式不存在", None
+
+            # 如果提供了SQL文件内容，则验证和执行SQL更新
+            if schema_data.sql_file_content and schema_data.sql_file_content.strip():
+                # 验证SQL语句（只允许建表语句）
+                from utils.sql_validator import SQLValidator
+                is_valid, validation_msg = SQLValidator.validate_create_table_sql(schema_data.sql_file_content)
+                if not is_valid:
+                    return False, validation_msg, None
+
+                # 执行SQL更新
+                success, error_msg = self._execute_schema_sql_update(schema_data)
+                if not success:
+                    return False, f"执行SQL失败: {error_msg}", None
+
+                # 更新sql_table字段
+                schema.sql_table = schema_data.sql_file_content
+
+            # 更新数据库模式记录
+            schema.schema_name = schema_data.schema_name
+            schema.schema_discription = schema_data.schema_description
+            schema.sql_schema = schema_data.sql_schema
+
+            # 如果提供了作者信息，则更新
+            if schema_data.schema_author:
+                schema.schema_author = schema_data.schema_author
+
+            db.commit()
+
+            return True, "修改数据库模式成功", SchemaUpdateResponse(
+                code=200,
+                msg="修改数据库模式成功"
+            )
+
+        except Exception as e:
+            db.rollback()
+            print(f"更新数据库模式失败: {e}")
+            return False, f"更新数据库模式失败: {str(e)}", None
+
+    def _execute_schema_sql_update(self, schema_data: SchemaUpdateRequest) -> Tuple[bool, str]:
+        """执行数据库模式SQL更新的私有方法"""
+        try:
+            from services.database_engine_service import database_engine_service
+
+            # 需要更新的数据库引擎列表
+            engines_to_update = ['mysql', 'postgresql', 'opengauss']
+            failed_engines = []
+            success_count = 0
+
+            for sql_engine in engines_to_update:
+                try:
+                    # 检查引擎是否可用
+                    if sql_engine not in database_engine_service.engines:
+                        failed_engines.append(f"{sql_engine}(不可用)")
+                        continue
+
+                    engine = database_engine_service.engines[sql_engine]
+
+                    # 执行SQL
+                    with engine.connect() as connection:
+                        from sqlalchemy import text
+
+                        # 根据数据库类型切换模式
+                        if sql_engine == "mysql":
+                            # MySQL切换代码
+                            connection.execute(text(f"DROP SCHEMA IF EXISTS {schema_data.sql_schema}"))
+                            connection.execute(text(f"CREATE SCHEMA {schema_data.sql_schema}"))
+                            connection.execute(text(f"USE {schema_data.sql_schema}"))
+                        elif sql_engine in ["postgresql", "opengauss"]:
+                            # PostgreSQL+OpenGauss切换代码
+                            connection.execute(text(f"DROP SCHEMA IF EXISTS {schema_data.sql_schema} CASCADE"))
+                            connection.execute(text(f"CREATE SCHEMA {schema_data.sql_schema}"))
+                            connection.execute(text(f"SET search_path TO {schema_data.sql_schema}"))
+
+                        # 执行SQL文件内容（更新时使用单一SQL内容）
+                        connection.execute(text(schema_data.sql_file_content))
+                        connection.commit()
+                        success_count += 1
+
+                except Exception as e:
+                    failed_engines.append(f"{sql_engine}({str(e)})")
+                    continue
+
+            # 如果有引擎执行失败，记录但不阻止整个操作（至少有一个成功即可）
+            if failed_engines:
+                print(f"警告：以下数据库引擎更新失败: {', '.join(failed_engines)}")
+
+            # 如果所有引擎都失败，返回错误
+            if success_count == 0:
+                return False, f"所有数据库引擎执行都失败: {', '.join(failed_engines)}"
+
+            return True, "SQL执行成功"
+
+        except Exception as e:
+            return False, f"执行SQL时发生异常: {str(e)}"
+
     def create_database_schema(self, teacher_id: str, schema_data: SchemaCreateRequest,
                               db: Session) -> Tuple[bool, str, Optional[SchemaCreateResponse]]:
         """根据HTML格式文本、数据库模式名称、SQL引擎和SQL建表文件创建数据库模式"""
@@ -1051,8 +916,12 @@ class TeacherService:
                 return False, "模式描述不能为空", None
             if not schema_data.schema_name or not schema_data.schema_name.strip():
                 return False, "数据库模式名称不能为空", None
-            if not schema_data.sql_file_content or not schema_data.sql_file_content.strip():
+            if not schema_data.sql_file_content:
                 return False, "SQL文件内容不能为空", None
+            if not schema_data.sql_file_content.mysql_engine or not schema_data.sql_file_content.mysql_engine.strip():
+                return False, "MySQL建表语句不能为空", None
+            if not schema_data.sql_file_content.postgresql_opengauss_engine or not schema_data.sql_file_content.postgresql_opengauss_engine.strip():
+                return False, "PostgreSQL/OpenGauss建表语句不能为空", None
             if not schema_data.sql_schema or not schema_data.sql_schema.strip():
                 return False, "SQL模式名称不能为空", None
             if not schema_data.schema_author or not schema_data.schema_author.strip():
@@ -1068,40 +937,107 @@ class TeacherService:
             # 2. 连接指定的SQL引擎并执行SQL文件
             from services.database_engine_service import database_engine_service
 
-            # 使用默认的PostgreSQL引擎
-            engine_type = "postgresql"
+            # 执行MySQL建表语句
+            mysql_schema_setup_sql = f"DROP SCHEMA IF EXISTS {schema_data.sql_schema};\nCREATE SCHEMA {schema_data.sql_schema};\nUSE {schema_data.sql_schema};"
+            mysql_complete_sql = mysql_schema_setup_sql + "\n" + schema_data.sql_file_content.mysql_engine
 
-            # 根据引擎类型构建schema创建和切换语句
-            if engine_type == "mysql":
-                # MySQL使用USE语句
-                schema_setup_sql = f"CREATE DATABASE IF NOT EXISTS {schema_data.sql_schema};\nUSE {schema_data.sql_schema};"
-            elif engine_type in ["postgresql", "opengauss"]:
-                # PostgreSQL/OpenGauss使用CREATE SCHEMA和SET search_path
-                schema_setup_sql = f"CREATE SCHEMA IF NOT EXISTS {schema_data.sql_schema};\nSET search_path TO {schema_data.sql_schema};"
-            else:
-                # 默认使用PostgreSQL语法
-                schema_setup_sql = f"CREATE SCHEMA IF NOT EXISTS {schema_data.sql_schema};\nSET search_path TO {schema_data.sql_schema};"
+            print(f"执行MySQL SQL语句: {mysql_complete_sql}")
 
-            # 组合完整的SQL语句：schema创建 + 用户SQL文件内容
-            complete_sql = schema_setup_sql + "\n" + schema_data.sql_file_content
-
-            print(f"执行完整SQL语句: {complete_sql}")
-
-            # 执行完整的SQL语句
-            success, error_msg, _ = database_engine_service.execute_sql(
-                sql=complete_sql,
-                engine_type=engine_type
+            mysql_success, mysql_error_msg, _ = database_engine_service.execute_sql(
+                sql=mysql_complete_sql,
+                engine_type="mysql"
             )
 
-            if not success:
-                return False, f"执行SQL文件失败: {error_msg}", None
+            # 执行PostgreSQL建表语句
+            postgresql_schema_setup_sql = f"DROP SCHEMA IF EXISTS {schema_data.sql_schema} CASCADE;\nCREATE SCHEMA {schema_data.sql_schema};\nSET search_path TO {schema_data.sql_schema};"
+            postgresql_complete_sql = postgresql_schema_setup_sql + "\n" + schema_data.sql_file_content.postgresql_opengauss_engine
+
+            print(f"执行PostgreSQL SQL语句: {postgresql_complete_sql}")
+
+            postgresql_success, postgresql_error_msg, _ = database_engine_service.execute_sql(
+                sql=postgresql_complete_sql,
+                engine_type="postgresql"
+            )
+
+            # 执行OpenGauss建表语句（使用直接psycopg2连接）
+            opengauss_schema_setup_sql = f"DROP SCHEMA IF EXISTS {schema_data.sql_schema} CASCADE;\nCREATE SCHEMA {schema_data.sql_schema};\nSET search_path TO {schema_data.sql_schema};"
+            opengauss_complete_sql = opengauss_schema_setup_sql + "\n" + schema_data.sql_file_content.postgresql_opengauss_engine
+
+            opengauss_success = False
+            opengauss_error_msg = ""
+
+            try:
+                # 从环境变量获取 OpenGauss 连接配置
+                host = os.getenv("OPENGAUSS_HOST", "localhost")
+                port = os.getenv("OPENGAUSS_PORT", "15432")
+                database = os.getenv("OPENGAUSS_DATABASE", "postgres")
+                user = os.getenv("OPENGAUSS_USER", "gaussdb")
+                password = os.getenv("OPENGAUSS_PASSWORD", "@Wyx778899")
+
+                # 使用psycopg2直接连接OpenGauss
+                conn = psycopg2.connect(
+                    host=host,
+                    port=port,
+                    database=database,
+                    user=user,
+                    password=password
+                )
+
+                with conn.cursor() as cur:
+                    # 分割并执行多个SQL语句
+                    sql_statements = [stmt.strip() for stmt in opengauss_complete_sql.split(';') if stmt.strip()]
+                    for statement in sql_statements:
+                        cur.execute(statement)
+
+                    # 提交事务
+                    conn.commit()
+                    opengauss_success = True
+
+            except psycopg2.Error as e:
+                opengauss_error_msg = f"OpenGauss连接错误: {e}"
+            except Exception as e:
+                opengauss_error_msg = f"OpenGauss执行错误: {e}"
+            finally:
+                # 确保关闭连接
+                if 'conn' in locals() and conn:
+                    conn.close()
+
+            # 检查执行结果
+            success_count = 0
+            error_messages = []
+
+            if mysql_success:
+                success_count += 1
+                print("MySQL执行成功")
+            else:
+                error_messages.append(f"MySQL错误: {mysql_error_msg}")
+
+            if postgresql_success:
+                success_count += 1
+                print("PostgreSQL执行成功")
+            else:
+                error_messages.append(f"PostgreSQL错误: {postgresql_error_msg}")
+
+            if opengauss_success:
+                success_count += 1
+                print("OpenGauss执行成功")
+            else:
+                error_messages.append(f"OpenGauss错误: {opengauss_error_msg}")
+
+            # 如果所有引擎都失败，返回错误
+            if success_count == 0:
+                return False, f"所有数据库引擎执行都失败: {'; '.join(error_messages)}", None
+            elif success_count < 3:
+                print(f"部分数据库引擎执行失败: {'; '.join(error_messages)}")
+                # 继续执行，只要有一个成功就算成功
 
             # 4. 执行成功后将数据插入到database_schema表中
             new_schema = DatabaseSchema(
                 schema_name=schema_data.schema_name,
                 schema_discription=schema_data.schema_description,  # 使用模式描述
                 sql_schema=schema_data.sql_schema,  # 保存SQL模式名称
-                schema_author=schema_data.schema_author  # 使用请求中的作者
+                schema_author=schema_data.schema_author,  # 使用请求中的作者
+                sql_table=schema_data.sql_file_content.postgresql_opengauss_engine  # 保存PostgreSQL建表语句
             )
 
             db.add(new_schema)

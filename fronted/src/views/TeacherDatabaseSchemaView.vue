@@ -220,25 +220,14 @@
 
                 <!-- 编辑模式下的额外配置 -->
                 <div v-if="isEditMode" class="edit-config">
-                  <div class="config-row">
-                    <div class="config-item">
-                      <h4>🔧 SQL引擎</h4>
-                      <el-select v-model="editForm.sql_engine" placeholder="请选择SQL引擎" style="width: 100%">
-                        <el-option label="PostgreSQL" value="postgresql" />
-                        <el-option label="MySQL" value="mysql" />
-                        <el-option label="Oracle" value="oracle" />
-                        <el-option label="SQL Server" value="sqlserver" />
-                      </el-select>
-                    </div>
-                    <div class="config-item">
-                      <h4>📋 SQL模式名称</h4>
-                      <el-input v-model="editForm.sql_schema" placeholder="请输入SQL模式名称" />
-                    </div>
+                  <div class="config-item">
+                    <h4>📋 SQL模式名称</h4>
+                    <el-input v-model="editForm.sql_schema" placeholder="请输入SQL模式名称" />
                   </div>
                   <div class="config-item">
-                    <h4>📁 更新SQL建表文件（可选）</h4>
+                    <h4>📁 更新MySQL建表文件（可选）</h4>
                     <el-upload
-                      :before-upload="handleEditFileChange"
+                      :before-upload="(file) => handleEditFileChange(file, 'mysql')"
                       :show-file-list="true"
                       :limit="1"
                       accept=".sql"
@@ -247,7 +236,7 @@
                     >
                       <el-icon class="el-icon--upload"><Upload /></el-icon>
                       <div class="el-upload__text">
-                        将SQL文件拖到此处，或<em>点击上传</em>
+                        将MySQL SQL文件拖到此处，或<em>点击上传</em>
                       </div>
                       <template #tip>
                         <div class="el-upload__tip">
@@ -255,6 +244,52 @@
                         </div>
                       </template>
                     </el-upload>
+                    
+                    <!-- MySQL文件内容显示 -->
+                    <div v-if="editMysqlFileContent" class="sql-content-display" style="margin-top: 10px;">
+                      <el-input
+                        v-model="editMysqlFileContent"
+                        type="textarea"
+                        :rows="4"
+                        readonly
+                        placeholder="MySQL SQL文件内容"
+                        class="sql-content-textarea"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div class="config-item">
+                    <h4>📁 更新PostgreSQL/OpenGauss建表文件（可选）</h4>
+                    <el-upload
+                      :before-upload="(file) => handleEditFileChange(file, 'postgresql')"
+                      :show-file-list="true"
+                      :limit="1"
+                      accept=".sql"
+                      drag
+                      class="sql-file-upload"
+                    >
+                      <el-icon class="el-icon--upload"><Upload /></el-icon>
+                      <div class="el-upload__text">
+                        将PostgreSQL/OpenGauss SQL文件拖到此处，或<em>点击上传</em>
+                      </div>
+                      <template #tip>
+                        <div class="el-upload__tip">
+                          只能上传.sql文件，且不超过10MB。如不上传则保持原有文件不变。
+                        </div>
+                      </template>
+                    </el-upload>
+                    
+                    <!-- PostgreSQL文件内容显示 -->
+                    <div v-if="editPostgresqlFileContent" class="sql-content-display" style="margin-top: 10px;">
+                      <el-input
+                        v-model="editPostgresqlFileContent"
+                        type="textarea"
+                        :rows="4"
+                        readonly
+                        placeholder="PostgreSQL/OpenGauss SQL文件内容"
+                        class="sql-content-textarea"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -409,31 +444,17 @@
     <!-- 创建数据库模式对话框 -->
     <el-dialog v-model="createDialogVisible" title="创建数据库模式" width="900px" class="create-schema-dialog">
       <el-form :model="createForm" :rules="createRules" ref="createFormRef" label-width="120px">
-        <div class="form-row">
-          <div class="form-col">
-            <el-form-item label="模式名称" prop="schema_name">
-              <el-input v-model="createForm.schema_name" placeholder="请输入数据库模式名称" />
-            </el-form-item>
-          </div>
-          <div class="form-col">
-            <el-form-item label="SQL引擎" prop="sql_engine">
-              <el-select v-model="createForm.sql_engine" placeholder="请选择SQL引擎" style="width: 100%">
-                <el-option label="PostgreSQL" value="postgresql" />
-                <el-option label="MySQL" value="mysql" />
-                <el-option label="Oracle" value="oracle" />
-                <el-option label="SQL Server" value="sqlserver" />
-              </el-select>
-            </el-form-item>
-          </div>
-        </div>
+        <el-form-item label="模式名称" prop="schema_name">
+          <el-input v-model="createForm.schema_name" placeholder="请输入数据库模式名称" />
+        </el-form-item>
 
         <el-form-item label="SQL模式名称" prop="sql_schema">
           <el-input v-model="createForm.sql_schema" placeholder="请输入SQL模式名称" />
         </el-form-item>
 
-        <el-form-item label="SQL建表文件" required>
+        <el-form-item label="MySQL建表文件" required>
           <el-upload
-            :before-upload="handleFileChange"
+            :before-upload="(file) => handleFileChange(file, 'mysql')"
             :show-file-list="true"
             :limit="1"
             accept=".sql"
@@ -442,7 +463,7 @@
           >
             <el-icon class="el-icon--upload"><Upload /></el-icon>
             <div class="el-upload__text">
-              将SQL文件拖到此处，或<em>点击上传</em>
+              将MySQL SQL文件拖到此处，或<em>点击上传</em>
             </div>
             <template #tip>
               <div class="el-upload__tip">
@@ -452,15 +473,50 @@
           </el-upload>
         </el-form-item>
 
-        <!-- SQL文件内容显示区域 -->
-        <el-form-item label="SQL文件内容" v-if="sqlFileContent">
+        <!-- MySQL SQL文件内容显示区域 -->
+        <el-form-item label="MySQL文件内容" v-if="mysqlFileContent">
           <div class="sql-content-display">
             <el-input
-              v-model="sqlFileContent"
+              v-model="mysqlFileContent"
               type="textarea"
-              :rows="8"
+              :rows="6"
               readonly
-              placeholder="SQL文件内容将在此显示"
+              placeholder="MySQL SQL文件内容将在此显示"
+              class="sql-content-textarea"
+            />
+          </div>
+        </el-form-item>
+
+        <el-form-item label="PostgreSQL/OpenGauss建表文件" required>
+          <el-upload
+            :before-upload="(file) => handleFileChange(file, 'postgresql')"
+            :show-file-list="true"
+            :limit="1"
+            accept=".sql"
+            drag
+            class="sql-file-upload"
+          >
+            <el-icon class="el-icon--upload"><Upload /></el-icon>
+            <div class="el-upload__text">
+              将PostgreSQL/OpenGauss SQL文件拖到此处，或<em>点击上传</em>
+            </div>
+            <template #tip>
+              <div class="el-upload__tip">
+                只能上传.sql文件，且不超过10MB
+              </div>
+            </template>
+          </el-upload>
+        </el-form-item>
+
+        <!-- PostgreSQL SQL文件内容显示区域 -->
+        <el-form-item label="PostgreSQL文件内容" v-if="postgresqlFileContent">
+          <div class="sql-content-display">
+            <el-input
+              v-model="postgresqlFileContent"
+              type="textarea"
+              :rows="6"
+              readonly
+              placeholder="PostgreSQL/OpenGauss SQL文件内容将在此显示"
               class="sql-content-textarea"
             />
           </div>
@@ -554,12 +610,14 @@ const editForm = ref({
   schema_id: 0,
   html_content: '',
   schema_name: '',
-  sql_engine: 'postgresql',
-  sql_file: null as File | null,
+  mysql_file: null as File | null,
+  postgresql_file: null as File | null,
   sql_schema: ''
 })
 const editFormRef = ref()
 const editLoading = ref(false)
+const editMysqlFileContent = ref('')
+const editPostgresqlFileContent = ref('')
 const currentPage = ref(1)
 const pageSize = ref(1000) // 设置较大值以显示完整内容
 
@@ -568,13 +626,14 @@ const createDialogVisible = ref(false)
 const createForm = ref({
   html_content: '',
   schema_name: '',
-  sql_engine: 'postgresql',
-  sql_file: null as File | null,
+  mysql_file: null as File | null,
+  postgresql_file: null as File | null,
   sql_schema: ''
 })
 const createFormRef = ref()
 const createLoading = ref(false)
-const sqlFileContent = ref('')
+const mysqlFileContent = ref('')
+const postgresqlFileContent = ref('')
 
 // 加载状态
 const queryLoading = ref(false)
@@ -622,9 +681,6 @@ const createRules = {
   schema_name: [
     { required: true, message: '请输入数据库模式名称', trigger: 'blur' },
     { min: 2, max: 50, message: '名称长度在 2 到 50 个字符', trigger: 'blur' }
-  ],
-  sql_engine: [
-    { required: true, message: '请选择SQL引擎', trigger: 'change' }
   ],
   sql_schema: [
     { required: true, message: '请输入SQL模式名称', trigger: 'blur' }
@@ -865,33 +921,73 @@ const showCreateDialog = () => {
   createForm.value = {
     html_content: '',
     schema_name: '',
-    sql_engine: 'postgresql',
-    sql_file: null,
+    mysql_file: null,
+    postgresql_file: null,
     sql_schema: ''
   }
-  sqlFileContent.value = ''
+  mysqlFileContent.value = ''
+  postgresqlFileContent.value = ''
 }
 
 // 处理文件上传
-const handleFileChange = (file: File) => {
-  createForm.value.sql_file = file
-  
-  // 读取文件内容并显示
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    sqlFileContent.value = e.target?.result as string
+const handleFileChange = (file: File, type: 'mysql' | 'postgresql') => {
+  if (type === 'mysql') {
+    createForm.value.mysql_file = file
+    
+    // 读取MySQL文件内容并显示
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      mysqlFileContent.value = e.target?.result as string
+    }
+    reader.onerror = () => {
+      ElMessage.error('MySQL文件读取失败')
+    }
+    reader.readAsText(file)
+  } else if (type === 'postgresql') {
+    createForm.value.postgresql_file = file
+    
+    // 读取PostgreSQL文件内容并显示
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      postgresqlFileContent.value = e.target?.result as string
+    }
+    reader.onerror = () => {
+      ElMessage.error('PostgreSQL文件读取失败')
+    }
+    reader.readAsText(file)
   }
-  reader.onerror = () => {
-    ElMessage.error('文件读取失败')
-  }
-  reader.readAsText(file)
   
   return false // 阻止自动上传
 }
 
 // 处理编辑模式文件上传
-const handleEditFileChange = (file: File) => {
-  editForm.value.sql_file = file
+const handleEditFileChange = (file: File, type: 'mysql' | 'postgresql') => {
+  if (type === 'mysql') {
+    editForm.value.mysql_file = file
+    
+    // 读取MySQL文件内容并显示
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      editMysqlFileContent.value = e.target?.result as string
+    }
+    reader.onerror = () => {
+      ElMessage.error('MySQL文件读取失败')
+    }
+    reader.readAsText(file)
+  } else if (type === 'postgresql') {
+    editForm.value.postgresql_file = file
+    
+    // 读取PostgreSQL文件内容并显示
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      editPostgresqlFileContent.value = e.target?.result as string
+    }
+    reader.onerror = () => {
+      ElMessage.error('PostgreSQL文件读取失败')
+    }
+    reader.readAsText(file)
+  }
+  
   return false // 阻止自动上传
 }
 
@@ -902,27 +998,45 @@ const createSchema = async () => {
   try {
     await createFormRef.value.validate()
 
-    if (!createForm.value.sql_file) {
-      ElMessage.error('请选择SQL文件')
+    // 检查是否上传了两个文件
+    if (!createForm.value.mysql_file) {
+      ElMessage.error('请上传MySQL建表文件')
+      return
+    }
+    if (!createForm.value.postgresql_file) {
+      ElMessage.error('请上传PostgreSQL/OpenGauss建表文件')
       return
     }
 
     createLoading.value = true
 
-    // 读取SQL文件内容为字符串
-    const sqlFileContent = await new Promise<string>((resolve, reject) => {
+    // 读取MySQL文件内容为字符串
+    const mysqlFileContent = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = (e) => {
         resolve(e.target?.result as string)
       }
       reader.onerror = reject
-      reader.readAsText(createForm.value.sql_file!)
+      reader.readAsText(createForm.value.mysql_file!)
+    })
+
+    // 读取PostgreSQL文件内容为字符串
+    const postgresqlFileContent = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        resolve(e.target?.result as string)
+      }
+      reader.onerror = reject
+      reader.readAsText(createForm.value.postgresql_file!)
     })
 
     const requestData = {
       schema_description: createForm.value.html_content,
       schema_name: createForm.value.schema_name,
-      sql_file_content: sqlFileContent, // 传递字符串内容
+      sql_file_content: {
+        mysql_engine: mysqlFileContent,
+        postgresql_opengauss_engine: postgresqlFileContent
+      },
       sql_schema: createForm.value.sql_schema,
       schema_author: teacherInfo.value.teacher_name || ''
     }
@@ -990,10 +1104,13 @@ const enterEditMode = () => {
     schema_id: selectedSchemaInfo.value.schema_id,
     html_content: selectedSchemaInfo.value.schema_description || '', // 加载完整的HTML内容，不去除任何标签
     schema_name: selectedSchemaInfo.value.schema_name,
-    sql_engine: 'postgresql', // 默认值，实际应该从后端获取
-    sql_file: null,
+    mysql_file: null,
+    postgresql_file: null,
     sql_schema: selectedSchemaInfo.value.schema_name // 默认使用schema_name
   }
+  // 重置文件内容显示
+  editMysqlFileContent.value = ''
+  editPostgresqlFileContent.value = ''
 }
 
 // 取消编辑
@@ -1003,62 +1120,100 @@ const cancelEdit = () => {
     schema_id: 0,
     html_content: '',
     schema_name: '',
-    sql_engine: 'postgresql',
-    sql_file: null,
+    mysql_file: null,
+    postgresql_file: null,
     sql_schema: ''
   }
+  // 重置文件内容显示
+  editMysqlFileContent.value = ''
+  editPostgresqlFileContent.value = ''
 }
 
-// 保存修改
+// 保存修改（先删除再创建）
 const saveChanges = async () => {
   if (!selectedSchemaInfo.value) return
 
   try {
+    // 检查是否上传了两个文件（如果要更新SQL文件的话）
+    const hasNewFiles = editForm.value.mysql_file || editForm.value.postgresql_file
+    if (hasNewFiles && (!editForm.value.mysql_file || !editForm.value.postgresql_file)) {
+      ElMessage.error('如果要更新SQL文件，请同时上传MySQL和PostgreSQL/OpenGauss两种文件')
+      return
+    }
+
     editLoading.value = true
 
-    const requestData: any = {
-      schema_id: editForm.value.schema_id,
+    // 第一步：删除原有模式
+    const deleteResponse = await axios.delete(`/teacher/schemas/${editForm.value.schema_id}`)
+    
+    if (!deleteResponse.data || !deleteResponse.data.success) {
+      ElMessage.error('删除原模式失败')
+      return
+    }
+
+    // 第二步：准备创建新模式的数据
+    let sqlFileContent: any
+    
+    if (hasNewFiles) {
+      // 如果有新文件，读取新文件内容
+      const mysqlContent = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve(e.target?.result as string)
+        reader.onerror = reject
+        reader.readAsText(editForm.value.mysql_file!)
+      })
+
+      const postgresqlContent = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve(e.target?.result as string)
+        reader.onerror = reject
+        reader.readAsText(editForm.value.postgresql_file!)
+      })
+
+      sqlFileContent = {
+        mysql_engine: mysqlContent,
+        postgresql_opengauss_engine: postgresqlContent
+      }
+    } else {
+      // 如果没有新文件，使用原有的文件内容（这里需要从原模式中获取）
+      // 注意：这里假设原模式的SQL文件内容可以从某个地方获取
+      // 实际实现中可能需要先获取原模式的完整信息
+      ElMessage.warning('未上传新的SQL文件，将保持原有文件不变')
+      // 这里可能需要调用API获取原有的SQL文件内容
+      // 为了简化，我们要求用户必须上传新文件
+      ElMessage.error('编辑模式下必须重新上传SQL文件')
+      return
+    }
+
+    // 第三步：创建新模式
+    const createData = {
       schema_description: editForm.value.html_content,
       schema_name: editForm.value.schema_name,
-      sql_schema: editForm.value.sql_schema
+      sql_file_content: sqlFileContent,
+      sql_schema: editForm.value.sql_schema,
+      schema_author: teacherInfo.value.teacher_name || ''
     }
 
-    // 如果有新的SQL文件，读取为字符串
-    if (editForm.value.sql_file) {
-      const sqlFileContent = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          resolve(e.target?.result as string)
-        }
-        reader.onerror = reject
-        reader.readAsText(editForm.value.sql_file!)
-      })
-      requestData.sql_file_content = sqlFileContent
-    }
-
-    const response = await axios.put('/teacher/schema/update', requestData, {
+    const createResponse = await axios.post('/teacher/schema/create', createData, {
       headers: {
         'Content-Type': 'application/json'
       }
     })
 
-    if (response.data && response.data.code === 200) {
+    if (createResponse.data && createResponse.data.code === 200) {
       ElMessage.success('数据库模式修改成功')
-
-      // 更新本地数据
-      selectedSchemaInfo.value.schema_description = editForm.value.html_content
-      selectedSchemaInfo.value.schema_name = editForm.value.schema_name
-
-      // 更新列表中的数据
-      const index = schemaList.value.findIndex(s => s.schema_id === editForm.value.schema_id)
-      if (index !== -1) {
-        schemaList.value[index].schema_description = editForm.value.html_content
-        schemaList.value[index].schema_name = editForm.value.schema_name
-      }
-
+      
+      // 退出编辑模式
       isEditMode.value = false
+      
+      // 清空选中状态，因为原模式已被删除
+      selectedSchema.value = ''
+      selectedSchemaInfo.value = null
+      
+      // 重新获取模式列表
+      await fetchSchemaList()
     } else {
-      ElMessage.error(response.data?.msg || '修改失败')
+      ElMessage.error(createResponse.data?.msg || '创建新模式失败')
     }
   } catch (error) {
     console.error('修改数据库模式失败:', error)

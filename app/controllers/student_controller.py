@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import json
 from models.base import get_db
 import schemas.student
 from schemas.student import (
@@ -248,14 +250,14 @@ async def get_student_answer_records(
 # 数据库模式列表接口已移至 /public 路径
 # 请使用 GET /public/schemas 替代此接口
 
-@student_router.post("/answer/ai-analyze", response_model=AIAnalyzeResponse, summary="AI分析SQL语句")
+@student_router.post("/answer/ai-analyze", summary="AI分析SQL语句（流式输出）")
 async def ai_analyze_sql(
     request: AIAnalyzeRequest,
     current_user: dict = Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
     """
-    AI智能分析题目解答情况
+    AI智能分析题目解答情况（流式输出）
 
     需要用户身份的JWT认证令牌
 
@@ -264,30 +266,45 @@ async def ai_analyze_sql(
     - answer_content: 学生提交的答案内容（SQL或其他文字）
 
     返回：
-    - code: 状态码（200表示成功）
-    - message: 响应消息
-    - ai_content: AI分析内容
+    流式响应，每个数据块格式为：
+    data: {"type": "content", "content": "分析内容片段"}
+    data: {"type": "done"}
     """
-    try:
-        from services.ai_service import ai_service
 
-        # 调用AI服务进行分析
-        ai_content = ai_service.analyze_sql_answer(
-            problem_id=request.problem_id,
-            answer_content=request.answer_content,
-            student_id=current_user["id"],
-            db=db
-        )
+    async def generate_ai_response():
+        """生成AI分析的流式响应"""
+        try:
+            from services.ai_service import ai_service
 
-        return AIAnalyzeResponse(
-            code=200,
-            message="请求成功！",
-            ai_content=ai_content
-        )
+            # 发送开始信号
+            yield f"data: {json.dumps({'type': 'start', 'message': '开始AI分析...'}, ensure_ascii=False)}\n\n"
 
-    except Exception as e:
-        return AIAnalyzeResponse(
-            code=500,
-            message=f"AI分析失败: {str(e)}",
-            ai_content="AI分析服务暂时不可用，请稍后再试。"
-        )
+            # 调用AI服务进行流式分析
+            async for chunk in ai_service.analyze_sql_answer_stream(
+                problem_id=request.problem_id,
+                answer_content=request.answer_content,
+                student_id=current_user["id"],
+                db=db
+            ):
+                if chunk:
+                    # 发送内容块
+                    yield f"data: {json.dumps({'type': 'content', 'content': chunk}, ensure_ascii=False)}\n\n"
+
+            # 发送完成信号
+            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+
+        except Exception as e:
+            # 发送错误信息
+            error_msg = f"AI分析失败: {str(e)}"
+            yield f"data: {json.dumps({'type': 'error', 'message': error_msg}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        generate_ai_response(),
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/plain; charset=utf-8"
+        }
+    )

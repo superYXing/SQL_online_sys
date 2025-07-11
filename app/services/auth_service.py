@@ -91,19 +91,11 @@ class AuthService:
                 return {"id": "1", "admin_id": "admin", "password": "admin123"}  # 实际应用中应该加密
             return None
         elif role == "teacher":
-            # 这里假设教师的用户名就是teacher_id的字符串形式
-            try:
-                teacher_id = int(account)
-                return db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
-            except ValueError:
-                return None
+            # 教师的用户名就是teacher_id的字符串形式
+            return db.query(Teacher).filter(Teacher.teacher_id == account).first()
         elif role == "student":
-            # 这里假设学生的用户名就是student_id的字符串形式
-            try:
-                student_id = int(account)
-                return db.query(Student).filter(Student.student_id == student_id).first()
-            except ValueError:
-                return None
+            # 学生的用户名就是student_id的字符串形式
+            return db.query(Student).filter(Student.student_id == account).first()
         
         return None
     
@@ -112,9 +104,23 @@ class AuthService:
         if isinstance(user, dict):  # 管理员
             return user.get("password") == password  # 实际应用中应该使用加密验证
         elif hasattr(user, 'teacher_password'):  # 教师
-            return user.teacher_password == password  # 实际应用中应该使用加密验证
+            # 清理密码字符串，去除可能的空白字符
+            stored_password = str(user.teacher_password).strip() if user.teacher_password else ""
+            input_password = str(password).strip() if password else ""
+            
+            # 详细调试信息
+            print(f"stored password: '{stored_password}' (length: {len(stored_password)})")
+            print(f"input password: '{input_password}' (length: {len(input_password)})")
+            print(f"stored password repr: {repr(stored_password)}")
+            print(f"input password repr: {repr(input_password)}")
+            
+            result = stored_password == input_password
+            return result
         elif hasattr(user, 'student_password'):  # 学生
-            return user.student_password == password  # 实际应用中应该使用加密验证
+            # 同样处理学生密码
+            stored_password = str(user.student_password).strip() if user.student_password else ""
+            input_password = str(password).strip() if password else ""
+            return stored_password == input_password
         
         return False
     

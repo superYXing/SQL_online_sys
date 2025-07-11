@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import os
 from dotenv import load_dotenv
 import json
+import psycopg2
 
 # 加载环境变量
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -41,6 +42,18 @@ class DatabaseEngineService:
                 
         except Exception as e:
             print(f"初始化数据库引擎失败: {e}")
+
+    def get_engine(self, engine_type: str):
+        """
+        获取指定类型的数据库引擎
+
+        Args:
+            engine_type: 数据库引擎类型 (mysql, postgresql, opengauss)
+
+        Returns:
+            数据库引擎对象，如果不存在则返回None
+        """
+        return self.engines.get(engine_type)
 
     def switch_database_or_schema(self, schema_name: str, engine_type: str = "mysql") -> Tuple[bool, str]:
         """
@@ -95,6 +108,10 @@ class DatabaseEngineService:
         Returns:
             Tuple[bool, str, Optional[List[Dict]]]: (是否成功, 消息, 结果数据)
         """
+        # OpenGauss 使用直接 psycopg2 连接
+        if engine_type == "opengauss":
+            return self._execute_sql_opengauss(sql)
+
         if engine_type not in self.engines:
             return False, f"不支持的数据库引擎: {engine_type}", None
 
@@ -150,6 +167,85 @@ class DatabaseEngineService:
             return False, f"执行错误: {str(e)}", None
         finally:
             session.close()
+
+    def _execute_sql_opengauss(self, sql: str) -> Tuple[bool, str, Optional[List[Dict]]]:
+        """
+        使用直接 psycopg2 连接执行 OpenGauss SQL
+
+        Args:
+            sql: SQL语句
+
+        Returns:
+            Tuple[bool, str, Optional[List[Dict]]]: (是否成功, 消息, 结果数据)
+        """
+        conn = None
+        try:
+            # 从环境变量获取 OpenGauss 连接配置
+            host = os.getenv("OPENGAUSS_HOST", "localhost")
+            port = os.getenv("OPENGAUSS_PORT", "15432")
+            database = os.getenv("OPENGAUSS_DATABASE", "postgres")
+            user = os.getenv("OPENGAUSS_USER", "gaussdb")
+            password = os.getenv("OPENGAUSS_PASSWORD", "@Wyx778899")
+
+            # 使用psycopg2直接连接OpenGauss
+            conn = psycopg2.connect(
+                host=host,
+                port=port,
+                database=database,
+                user=user,
+                password=password
+            )
+
+            with conn.cursor() as cur:
+                # 分割多个SQL语句
+                sql_statements = [stmt.strip() for stmt in sql.split(';') if stmt.strip()]
+
+                last_result = None
+
+                for statement in sql_statements:
+                    cur.execute(statement)
+
+                    # 如果是查询语句，保存结果
+                    if statement.strip().upper().startswith('SELECT'):
+                        rows = cur.fetchall()
+                        columns = [desc[0] for desc in cur.description]
+
+                        data = []
+                        for row in rows:
+                            row_dict = {}
+                            for j, column in enumerate(columns):
+                                value = row[j]
+                                # 处理特殊数据类型
+                                if hasattr(value, 'isoformat'):  # datetime对象
+                                    value = value.isoformat()
+                                elif isinstance(value, (bytes, bytearray)):  # 二进制数据
+                                    value = str(value)
+                                row_dict[column] = value
+                            data.append(row_dict)
+
+                        last_result = data
+
+                # 提交事务
+                conn.commit()
+
+                # 返回最后一个查询的结果，如果没有查询则返回空列表
+                if last_result is not None:
+                    return True, "执行成功", last_result
+                else:
+                    return True, "执行成功", []
+
+        except psycopg2.Error as e:
+            if conn:
+                conn.rollback()
+            return False, f"OpenGauss连接错误: {e}", None
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            return False, f"OpenGauss执行错误: {e}", None
+        finally:
+            # 确保关闭连接
+            if conn:
+                conn.close()
     
     def compare_results_unordered(self, student_sql: str, answer_sql: str, engine_type: str = "postgresql") -> Tuple[bool, str]:
         """

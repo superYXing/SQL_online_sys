@@ -1,6 +1,6 @@
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, String
 from models import Semester, DateRange, DatabaseSchema, Problem
 from schemas.public import (
     CurrentSemesterResponse, SemesterInfo, SemesterListResponse,
@@ -23,7 +23,7 @@ class PublicService:
                 Semester.semester_id,
                 Semester.semester_name
             ).select_from(Semester).join(
-                DateRange, Semester.date_id == DateRange.date_id
+                DateRange, Semester.date_id == func.cast(DateRange.date_id, String)
             ).filter(
                 and_(
                     DateRange.begin_date <= current_date,
@@ -58,7 +58,6 @@ class PublicService:
     def get_all_semesters(self, db: Session) -> SemesterListResponse:
         """获取所有学期列表"""
         try:
-            current_date = date.today()
             
             # 查询所有学期及其日期范围
             semesters_query = db.query(
@@ -67,7 +66,7 @@ class PublicService:
                 DateRange.begin_date,
                 DateRange.end_date
             ).select_from(Semester).outerjoin(
-                DateRange, Semester.date_id == DateRange.date_id
+                DateRange, Semester.date_id == func.cast(DateRange.date_id, String)
             ).order_by(Semester.semester_id.desc()).all()
             
             # 获取当前学期
@@ -187,7 +186,7 @@ class PublicService:
                 DateRange.begin_date,
                 DateRange.end_date
             ).select_from(Semester).outerjoin(
-                DateRange, Semester.date_id == DateRange.date_id
+                DateRange, Semester.date_id == func.cast(DateRange.date_id, String)
             ).filter(
                 Semester.semester_id == semester_id
             ).first()
