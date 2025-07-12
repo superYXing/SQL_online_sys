@@ -10,8 +10,32 @@
         </div>
       </div>
       <div class="header-right">
-          <span class="username">admin001</span>
+        <div class="admin-status">
+          <div class="status-item">
+            <span class="status-label">管理员:</span>
+            <el-dropdown @command="handleCommand">
+              <span class="username-dropdown">
+                admin001
+                <el-icon class="el-icon--right"><arrow-down /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="changePassword">修改密码</el-dropdown-item>
+                  <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+          <div class="status-item">
+            <span class="status-label">当前学期:</span>
+            <span class="status-value">{{ currentSemesterComputed?.semester_name || '暂无' }}</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">系统状态:</span>
+            <span class="status-value online">在线</span>
+          </div>
         </div>
+      </div>
     </el-header>
 
     <el-container class="main-container">
@@ -42,24 +66,34 @@
         <!-- 动态显示不同类型的学期 -->
         <div class="semester-section" v-if="activeSection === 'upcoming'">
           <h3>未开始的学期</h3>
-          <div v-for="semester in upcomingSemesters" :key="semester.semester_id" class="semester-item">
-            <div class="semester-info">
-              <span class="semester-name">{{ semester.semester_name }}</span>
-              <div class="semester-actions">
-                <el-icon class="action-icon delete-icon" @click="deleteSemester(semester.semester_id)"><Delete /></el-icon>
+          <div v-if="upcomingSemesters.length > 0">
+            <div v-for="semester in upcomingSemesters" :key="semester.semester_id" class="semester-item">
+              <div class="semester-info">
+                <span class="semester-name">{{ semester.semester_name }}</span>
+                <div class="semester-actions">
+                  <el-icon class="action-icon delete-icon" @click="deleteSemester(semester.semester_id)"><Delete /></el-icon>
+                </div>
               </div>
-            </div>
-            <div class="semester-dates">
-              <div class="date-item">
-                <el-icon><Calendar /></el-icon>
-                <span>{{ formatDate(semester.begin_date) }}</span>
-              </div>
-              <div class="date-item">
-                <el-icon><Calendar /></el-icon>
-                <span>{{ formatDate(semester.end_date) }}</span>
+              <div class="semester-dates">
+                <div class="date-item">
+                  <el-icon><Calendar /></el-icon>
+                  <span>{{ formatDate(semester.begin_date) }}</span>
+                </div>
+                <div class="date-item">
+                  <el-icon><Calendar /></el-icon>
+                  <span>{{ formatDate(semester.end_date) }}</span>
+                </div>
               </div>
             </div>
           </div>
+          <EmptyState v-else title="暂无未开始的学期" description="当前没有计划中的学期，您可以创建新的学期。">
+            <template #actions>
+              <el-button type="primary" @click="switchSection('create')">
+                <el-icon><Plus /></el-icon>
+                创建学期
+              </el-button>
+            </template>
+          </EmptyState>
         </div>
 
         <div class="semester-section" v-if="activeSection === 'current'">
@@ -89,24 +123,27 @@
 
         <div class="semester-section" v-if="activeSection === 'ended'">
           <h3>已结束的学期</h3>
-          <div v-for="semester in endedSemesters" :key="semester.semester_id" class="semester-item">
-            <div class="semester-info">
-              <span class="semester-name">{{ semester.semester_name }}</span>
-              <div class="semester-actions">
-                <el-icon class="action-icon delete-icon" @click="deleteSemester(semester.semester_id)"><Delete /></el-icon>
+          <div v-if="endedSemesters.length > 0">
+            <div v-for="semester in endedSemesters" :key="semester.semester_id" class="semester-item">
+              <div class="semester-info">
+                <span class="semester-name">{{ semester.semester_name }}</span>
+                <div class="semester-actions">
+                  <el-icon class="action-icon delete-icon" @click="deleteSemester(semester.semester_id)"><Delete /></el-icon>
+                </div>
               </div>
-            </div>
-            <div class="semester-dates">
-              <div class="date-item">
-                <el-icon><Calendar /></el-icon>
-                <span>{{ formatDate(semester.begin_date) }}</span>
-              </div>
-              <div class="date-item">
-                <el-icon><Calendar /></el-icon>
-                <span>{{ formatDate(semester.end_date) }}</span>
+              <div class="semester-dates">
+                <div class="date-item">
+                  <el-icon><Calendar /></el-icon>
+                  <span>{{ formatDate(semester.begin_date) }}</span>
+                </div>
+                <div class="date-item">
+                  <el-icon><Calendar /></el-icon>
+                  <span>{{ formatDate(semester.end_date) }}</span>
+                </div>
               </div>
             </div>
           </div>
+          <EmptyState v-else title="暂无已结束的学期" description="当前没有已结束的学期记录。" />
         </div>
 
         <div class="semester-section" v-if="activeSection === 'create'">
@@ -226,6 +263,54 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 修改密码对话框 -->
+    <el-dialog
+      v-model="passwordDialogVisible"
+      title="修改密码"
+      width="400px"
+      :before-close="() => { passwordDialogVisible = false; resetPasswordForm(); }"
+    >
+      <el-form
+        ref="passwordFormRef"
+        :model="passwordForm"
+        :rules="passwordRules"
+        label-width="100px"
+      >
+        <el-form-item label="原密码" prop="old_password">
+          <el-input
+            v-model="passwordForm.old_password"
+            type="password"
+            placeholder="请输入原密码"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item label="新密码" prop="new_password">
+          <el-input
+            v-model="passwordForm.new_password"
+            type="password"
+            placeholder="请输入新密码"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirm_password">
+          <el-input
+            v-model="passwordForm.confirm_password"
+            type="password"
+            placeholder="请确认新密码"
+            show-password
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="passwordDialogVisible = false; resetPasswordForm();">取消</el-button>
+          <el-button type="primary" @click="changePassword" :loading="passwordLoading">
+            确定
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -241,7 +326,9 @@ import {
   ElMain,
   ElMenu,
   ElMenuItem,
-
+  ElDropdown,
+  ElDropdownMenu,
+  ElDropdownItem,
   ElIcon,
   ElButton,
   ElButtonGroup,
@@ -255,7 +342,7 @@ import {
   type FormRules
 } from 'element-plus'
 import {
-
+  ArrowDown,
   Plus,
   Calendar,
   Clock,
@@ -265,6 +352,7 @@ import {
   ArrowRight
 } from '@element-plus/icons-vue'
 import axios from 'axios'
+import EmptyState from '@/components/EmptyState.vue'
 
 // 路由
 const router = useRouter()
@@ -304,6 +392,16 @@ const addSemesterForm = reactive({
   begin_date: '',
   end_date: ''
 })
+
+// 修改密码相关
+const passwordDialogVisible = ref(false)
+const passwordFormRef = ref<FormInstance>()
+const passwordForm = ref({
+  old_password: '',
+  new_password: '',
+  confirm_password: ''
+})
+const passwordLoading = ref(false)
 
 // 表单验证规则
 const addSemesterRules: FormRules = {
@@ -388,39 +486,10 @@ const fetchSemesters = async () => {
     }
   } catch (error: unknown) {
     console.error('获取学期数据失败:', error)
-    ElMessage.error('获取学期数据失败，使用模拟数据')
+    ElMessage.error('获取学期数据失败，请检查网络连接')
     
-    // 使用模拟数据
-    const mockData: Semester[] = [
-      {
-        semester_id: 1,
-        semester_name: '2025春季',
-        begin_date: '2025-02-01',
-        end_date: '2025-06-30',
-        is_current: true
-      },
-      {
-        semester_id: 2,
-        semester_name: '2024秋季',
-        begin_date: '2024-09-01',
-        end_date: '2024-12-31',
-        is_current: false
-      },
-      {
-        semester_id: 3,
-        semester_name: '2024春季',
-        begin_date: '2024-02-01',
-        end_date: '2024-06-30',
-        is_current: false
-      }
-    ]
-    
-    semesters.value = mockData
-    const current = mockData.find(s => s.is_current)
-    if (current) {
-      semesterStartDate.value = current.begin_date
-      semesterEndDate.value = current.end_date
-    }
+    // 清空数据，显示无数据状态
+    semesters.value = []
   }
 }
 
@@ -672,6 +741,121 @@ const updateSemesterTime = async () => {
   }
 }
 
+// 密码验证规则
+const passwordRules: FormRules = {
+  old_password: [
+    { required: true, message: '请输入原密码', trigger: 'blur' }
+  ],
+  new_password: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, message: '密码长度至少6位', trigger: 'blur' }
+  ],
+  confirm_password: [
+    { required: true, message: '请确认新密码', trigger: 'blur' },
+    {
+      validator: (rule: any, value: any, callback: any) => {
+        if (value !== passwordForm.value.new_password) {
+          callback(new Error('两次输入的密码不一致'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ]
+}
+
+// 下拉菜单处理
+const handleCommand = (command: string) => {
+  if (command === 'changePassword') {
+    passwordDialogVisible.value = true
+  } else if (command === 'logout') {
+    handleLogout()
+  }
+}
+
+// 修改密码
+const changePassword = async () => {
+  if (!passwordFormRef.value) return
+  
+  try {
+    const valid = await passwordFormRef.value.validate()
+    if (!valid) return
+    
+    passwordLoading.value = true
+    
+    // 从localStorage获取JWT Token
+    const token = localStorage.getItem('token')
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    
+    const response = await axios.put('http://localhost:8000/admin/change-password', {
+      old_password: passwordForm.value.old_password,
+      new_password: passwordForm.value.new_password
+    }, { headers })
+    
+    if (response.data.success) {
+      ElMessage.success('密码修改成功')
+      passwordDialogVisible.value = false
+      resetPasswordForm()
+    } else {
+      ElMessage.error(response.data.message || '密码修改失败')
+    }
+  } catch (error: unknown) {
+    console.error('修改密码失败:', error)
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { data?: { message?: string } } }
+      if (axiosError.response?.data?.message) {
+        ElMessage.error(axiosError.response.data.message)
+      } else {
+        ElMessage.error('密码修改失败，请检查网络连接')
+      }
+    } else {
+      ElMessage.error('密码修改失败，请检查网络连接')
+    }
+  } finally {
+    passwordLoading.value = false
+  }
+}
+
+// 重置密码表单
+const resetPasswordForm = () => {
+  passwordForm.value = {
+    old_password: '',
+    new_password: '',
+    confirm_password: ''
+  }
+  if (passwordFormRef.value) {
+    passwordFormRef.value.clearValidate()
+  }
+}
+
+// 退出登录
+const handleLogout = async () => {
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '确认退出', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    // 清除本地存储的token
+    localStorage.removeItem('token')
+    localStorage.removeItem('user_type')
+    localStorage.removeItem('username')
+    
+    // 跳转到登录页面
+    window.location.href = '/login'
+  } catch {
+    // 用户取消退出
+  }
+}
+
 // 组件挂载时获取数据
 onMounted(() => {
   fetchSemesters()
@@ -749,6 +933,38 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.admin-status {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.status-label {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: normal;
+}
+
+.status-value {
+  color: white;
+  font-weight: 500;
+}
+
+.status-value.online {
+  color: #52c41a;
+  font-weight: 600;
 }
 
 .username {

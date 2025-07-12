@@ -279,10 +279,23 @@ class StudentService:
                 switch_success, switch_message, _ = database_engine_service.execute_sql(switch_sql, engine_type)
                 if not switch_success:
                     print(f"执行数据库切换失败: {switch_message}")
-                    # 继续执行，不因切换失败而中断
+                    # 结束并返回错误信息
+                    return -1, f"数据库切换失败: {switch_message}", None
 
             # 2. 检查学生SQL的语法
-            success, error_msg, student_result = database_engine_service.execute_sql(answer_content, engine_type)
+            # 把switch_sql拼接在answer_content前面，用分号;分隔
+            if schema and schema.sql_schema:
+                # 构建完整的SQL语句（包含数据库切换语句）
+                if engine_type == "mysql":
+                    full_sql = f"USE {schema.sql_schema};{answer_content}"
+                elif engine_type in ["postgresql", "opengauss"]:
+                    full_sql = f"SET search_path TO {schema.sql_schema};{answer_content}"
+                else:
+                    full_sql = f"USE {schema.sql_schema};{answer_content}"
+            else:
+                full_sql = answer_content
+
+            success, error_msg, student_result = database_engine_service.execute_sql(full_sql, engine_type)
 
             if not success:
                 # 语法错误

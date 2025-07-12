@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint, String, DateTime, SmallInteger
+from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint, String, DateTime, SmallInteger, Text
 from sqlalchemy.orm import relationship
 from models.base import Base
 
@@ -10,7 +10,7 @@ class AnswerRecord(Base):
     student_id = Column(Integer, ForeignKey("student.id"), nullable=False)
     problem_id = Column(Integer, ForeignKey("problem.problem_id"), nullable=False)
     result_type = Column(SmallInteger, nullable=False,comment="0:正确  1：语法错误  2：结果错误")
-    answer_content = Column(String(255), nullable=False)
+    answer_content = Column(Text, nullable=False)
     timestep = Column(DateTime, nullable=False)
 
     
@@ -19,4 +19,4 @@ class AnswerRecord(Base):
     problem = relationship("Problem", back_populates="answer_records")
     
     def __repr__(self):
-        return f"<AnswerRecord(id={self.id}, student_id={self.student_id}, problem_id={self.problem_id})>" 
+        return f"<AnswerRecord(id={self.id}, student_id={self.student_id}, problem_id={self.problem_id})>"

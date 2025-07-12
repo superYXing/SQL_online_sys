@@ -6,7 +6,9 @@
         <span class="logo" @click="goToHome">SQL在线实践平台</span>
         <div class="nav-buttons">
           <el-button type="text" @click="goToDashboard" class="nav-btn">数据面板</el-button>
-          <el-button type="text" @click="goToDatabaseSchema" class="nav-btn active">数据库模式</el-button>
+          <el-button type="text" @click="goToDatabaseSchema" class="nav-btn active"
+            >数据库模式</el-button
+          >
           <el-button type="text" @click="goToProblem" class="nav-btn">题目</el-button>
           <el-button type="text" @click="goToStudentInfo" class="nav-btn">学生信息</el-button>
         </div>
@@ -14,7 +16,8 @@
       <div class="header-right">
         <el-dropdown @command="handleCommand" trigger="click">
           <span class="username-dropdown">
-            {{ teacherInfo.teacher_name || '加载中...' }} <el-icon class="el-icon--right"><arrow-down /></el-icon>
+            {{ teacherInfo.teacher_name || '加载中...' }}
+            <el-icon class="el-icon--right"><arrow-down /></el-icon>
           </span>
           <template #dropdown>
             <el-dropdown-menu>
@@ -38,7 +41,9 @@
                   <el-button type="text" @click="goBack" class="back-btn">
                     <el-icon><ArrowLeft /></el-icon>
                   </el-button>
-                  <h3 class="title-with-spacing"><el-icon><DataAnalysis /></el-icon> 数据库模式</h3>
+                  <h3 class="title-with-spacing">
+                    <el-icon><DataAnalysis /></el-icon> 数据库模式
+                  </h3>
                 </div>
                 <el-button type="primary" @click="showCreateDialog" class="create-btn">
                   <el-icon><Plus /></el-icon>
@@ -59,7 +64,10 @@
                   <div class="schema-author">{{ schema.schema_author }}</div>
                   <!-- 数据库模式状态信息 -->
                   <div class="schema-visibility">
-                    <el-tag :type="getVisibilityTagType(schema.visibility || 'fully_visible')" size="small">
+                    <el-tag
+                      :type="getVisibilityTagType(schema.visibility || 'fully_visible')"
+                      size="small"
+                    >
                       {{ getVisibilityText(schema.visibility || 'fully_visible') }}
                     </el-tag>
                   </div>
@@ -86,7 +94,9 @@
                   <el-radio v-model="defaultVisibility" label="fully_visible" disabled>
                     完全可见
                   </el-radio>
-                  <p class="option-desc">学生可以使用数据库模式的题目，也可以使用数据库模式的查询功能。</p>
+                  <p class="option-desc">
+                    学生可以使用数据库模式的题目，也可以使用数据库模式的查询功能。
+                  </p>
                 </div>
                 <div class="visibility-option">
                   <el-radio v-model="defaultVisibility" label="problem_only" disabled>
@@ -119,7 +129,9 @@
           <!-- 中间：选项表单（选择模式后显示） -->
           <div class="middle-panel" v-if="selectedSchema">
             <div class="panel-header">
-              <h3><el-icon><Setting /></el-icon> 数据库模式操作</h3>
+              <h3>
+                <el-icon><Setting /></el-icon> 数据库模式操作
+              </h3>
             </div>
             <div class="option-buttons">
               <el-button
@@ -158,7 +170,9 @@
             <!-- 基本信息 -->
             <div v-if="activeTab === 'basic'" class="content-panel">
               <div class="panel-header">
-                <h3><el-icon><Document /></el-icon> 基本信息</h3>
+                <h3>
+                  <el-icon><Document /></el-icon> 基本信息
+                </h3>
                 <div class="header-actions">
                   <el-button v-if="!isEditMode" type="primary" @click="enterEditMode">
                     <el-icon><Edit /></el-icon>
@@ -176,7 +190,12 @@
               <div class="basic-info-content">
                 <div class="schema-header">
                   <h2 v-if="!isEditMode">{{ selectedSchemaInfo.schema_name }}</h2>
-                  <el-input v-else v-model="editForm.schema_name" placeholder="数据库模式名称" class="schema-name-input" />
+                  <el-input
+                    v-else
+                    v-model="editForm.schema_name"
+                    placeholder="数据库模式名称"
+                    class="schema-name-input"
+                  />
                   <p class="author">作者：{{ selectedSchemaInfo.schema_author }}</p>
                 </div>
 
@@ -184,7 +203,9 @@
                 <div class="schema-description">
                   <h4>📝 数据库模式描述</h4>
                   <div v-if="!isEditMode" class="description-viewer expanded">
-                    <div v-html="selectedSchemaInfo.schema_description || getDefaultDescription()"></div>
+                    <div
+                      v-html="selectedSchemaInfo.schema_description || getDefaultDescription()"
+                    ></div>
                     <el-pagination
                       v-if="false"
                       v-model:current-page="currentPage"
@@ -195,27 +216,74 @@
                     />
                   </div>
                   <div v-else class="description-editor">
-                     <QuillEditor
-                       v-model:content="editForm.html_content"
-                       content-type="html"
-                       theme="snow"
-                       :options="{
-                         modules: {
-                           toolbar: [
-                             ['bold', 'italic', 'underline', 'strike'],
-                             ['blockquote', 'code-block'],
-                             [{ 'header': 1 }, { 'header': 2 }],
-                             [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                             [{ 'color': [] }, { 'background': [] }],
-                             ['link', 'image'],
-                             ['clean']
-                           ]
-                         },
-                         placeholder: '请输入数据库模式描述...'
-                       }"
-                       style="height: 400px;"
-                     />
-                   </div>
+                    <div class="html-editor-header">
+                      <div class="editor-tabs">
+                        <el-button
+                          :type="editHtmlViewMode === 'edit' ? 'primary' : 'default'"
+                          @click="editHtmlViewMode = 'edit'"
+                          size="small"
+                        >
+                          <el-icon><Edit /></el-icon>
+                          编辑
+                        </el-button>
+                        <el-button
+                          :type="editHtmlViewMode === 'preview' ? 'primary' : 'default'"
+                          @click="editHtmlViewMode = 'preview'"
+                          size="small"
+                        >
+                          <el-icon><View /></el-icon>
+                          预览
+                        </el-button>
+                        <el-button
+                          :type="editHtmlViewMode === 'split' ? 'primary' : 'default'"
+                          @click="editHtmlViewMode = 'split'"
+                          size="small"
+                        >
+                          <el-icon><Grid /></el-icon>
+                          分栏
+                        </el-button>
+                      </div>
+                    </div>
+                    <div class="html-editor-content" :class="`mode-${editHtmlViewMode}`">
+                      <!-- 编辑模式 -->
+                      <div v-if="editHtmlViewMode === 'edit'" class="editor-panel full">
+                        <el-input
+                          v-model="editForm.html_content"
+                          type="textarea"
+                          :rows="20"
+                          placeholder="请输入HTML代码..."
+                          class="html-code-editor"
+                        />
+                      </div>
+                      <!-- 预览模式 -->
+                      <div v-else-if="editHtmlViewMode === 'preview'" class="preview-panel full">
+                        <div
+                          class="html-preview"
+                          v-html="editForm.html_content || '<p>暂无内容</p>'"
+                        ></div>
+                      </div>
+                      <!-- 分栏模式 -->
+                      <div v-else class="split-view">
+                        <div class="editor-panel half">
+                          <div class="panel-title">HTML代码</div>
+                          <el-input
+                            v-model="editForm.html_content"
+                            type="textarea"
+                            :rows="18"
+                            placeholder="请输入HTML代码..."
+                            class="html-code-editor"
+                          />
+                        </div>
+                        <div class="preview-panel half">
+                          <div class="panel-title">预览效果</div>
+                          <div
+                            class="html-preview"
+                            v-html="editForm.html_content || '<p>暂无内容</p>'"
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- 编辑模式下的额外配置 -->
@@ -244,9 +312,13 @@
                         </div>
                       </template>
                     </el-upload>
-                    
+
                     <!-- MySQL文件内容显示 -->
-                    <div v-if="editMysqlFileContent" class="sql-content-display" style="margin-top: 10px;">
+                    <div
+                      v-if="editMysqlFileContent"
+                      class="sql-content-display"
+                      style="margin-top: 10px"
+                    >
                       <el-input
                         v-model="editMysqlFileContent"
                         type="textarea"
@@ -257,7 +329,7 @@
                       />
                     </div>
                   </div>
-                  
+
                   <div class="config-item">
                     <h4>📁 更新PostgreSQL/OpenGauss建表文件（可选）</h4>
                     <el-upload
@@ -278,9 +350,13 @@
                         </div>
                       </template>
                     </el-upload>
-                    
+
                     <!-- PostgreSQL文件内容显示 -->
-                    <div v-if="editPostgresqlFileContent" class="sql-content-display" style="margin-top: 10px;">
+                    <div
+                      v-if="editPostgresqlFileContent"
+                      class="sql-content-display"
+                      style="margin-top: 10px"
+                    >
                       <el-input
                         v-model="editPostgresqlFileContent"
                         type="textarea"
@@ -301,7 +377,9 @@
                       <el-radio v-model="defaultVisibility" label="fully_visible" disabled>
                         完全可见
                       </el-radio>
-                      <p class="option-desc">学生可以使用数据库模式的题目，也可以使用数据库模式的查询功能。</p>
+                      <p class="option-desc">
+                        学生可以使用数据库模式的题目，也可以使用数据库模式的查询功能。
+                      </p>
                     </div>
                     <div class="visibility-option">
                       <el-radio v-model="defaultVisibility" label="problem_only" disabled>
@@ -335,7 +413,9 @@
             <!-- 查询面板 -->
             <div v-if="activeTab === 'query'" class="content-panel">
               <div class="panel-header">
-                <h3><el-icon><Search /></el-icon> SQL查询</h3>
+                <h3>
+                  <el-icon><Search /></el-icon> SQL操作（可查询表格，也可更新表格）
+                </h3>
                 <div class="query-actions">
                   <el-button type="primary" @click="executeQuery" :loading="queryLoading">
                     <el-icon><Search /></el-icon>
@@ -363,7 +443,9 @@
                 <!-- 查询结果表格 -->
                 <div class="results-section">
                   <div class="results-header">
-                    <h4><el-icon><Grid /></el-icon> 查询结果</h4>
+                    <h4>
+                      <el-icon><Grid /></el-icon> 查询结果
+                    </h4>
                     <div class="results-info" v-if="queryResults.length > 0">
                       共 {{ queryResults.length }} 条记录
                     </div>
@@ -399,7 +481,9 @@
             <!-- 数据表 -->
             <div v-if="activeTab === 'tables'" class="content-panel">
               <div class="panel-header">
-                <h3><el-icon><Grid /></el-icon> 数据表</h3>
+                <h3>
+                  <el-icon><Grid /></el-icon> 数据表
+                </h3>
               </div>
               <div class="placeholder-content">
                 <el-empty description="数据表功能开发中..." />
@@ -409,7 +493,9 @@
             <!-- 视图 -->
             <div v-if="activeTab === 'views'" class="content-panel">
               <div class="panel-header">
-                <h3><el-icon><View /></el-icon> 视图</h3>
+                <h3>
+                  <el-icon><View /></el-icon> 视图
+                </h3>
               </div>
               <div class="placeholder-content">
                 <el-empty description="视图功能开发中..." />
@@ -422,7 +508,12 @@
 
     <!-- 修改密码对话框 -->
     <el-dialog v-model="passwordDialogVisible" title="修改密码" width="400px">
-      <el-form :model="passwordForm" :rules="passwordRules" ref="passwordFormRef" label-width="100px">
+      <el-form
+        :model="passwordForm"
+        :rules="passwordRules"
+        ref="passwordFormRef"
+        label-width="100px"
+      >
         <el-form-item label="原密码" prop="oldPassword">
           <el-input v-model="passwordForm.oldPassword" type="password" show-password />
         </el-form-item>
@@ -442,7 +533,12 @@
     </el-dialog>
 
     <!-- 创建数据库模式对话框 -->
-    <el-dialog v-model="createDialogVisible" title="创建数据库模式" width="900px" class="create-schema-dialog">
+    <el-dialog
+      v-model="createDialogVisible"
+      title="创建数据库模式"
+      width="900px"
+      class="create-schema-dialog"
+    >
       <el-form :model="createForm" :rules="createRules" ref="createFormRef" label-width="120px">
         <el-form-item label="模式名称" prop="schema_name">
           <el-input v-model="createForm.schema_name" placeholder="请输入数据库模式名称" />
@@ -462,13 +558,9 @@
             class="sql-file-upload"
           >
             <el-icon class="el-icon--upload"><Upload /></el-icon>
-            <div class="el-upload__text">
-              将MySQL SQL文件拖到此处，或<em>点击上传</em>
-            </div>
+            <div class="el-upload__text">将MySQL SQL文件拖到此处，或<em>点击上传</em></div>
             <template #tip>
-              <div class="el-upload__tip">
-                只能上传.sql文件，且不超过10MB
-              </div>
+              <div class="el-upload__tip">只能上传.sql文件，且不超过10MB</div>
             </template>
           </el-upload>
         </el-form-item>
@@ -501,9 +593,7 @@
               将PostgreSQL/OpenGauss SQL文件拖到此处，或<em>点击上传</em>
             </div>
             <template #tip>
-              <div class="el-upload__tip">
-                只能上传.sql文件，且不超过10MB
-              </div>
+              <div class="el-upload__tip">只能上传.sql文件，且不超过10MB</div>
             </template>
           </el-upload>
         </el-form-item>
@@ -523,34 +613,74 @@
         </el-form-item>
 
         <el-form-item label="模式描述" prop="html_content">
-           <div class="html-editor-container">
-             <QuillEditor
-               v-model:content="createForm.html_content"
-              contentType="html"
-              :options="{
-                theme: 'snow',
-                modules: {
-                  toolbar: [
-                    ['bold', 'italic', 'underline', 'strike'],
-                    ['blockquote', 'code-block'],
-                    [{ 'header': 1 }, { 'header': 2 }],
-                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                    [{ 'script': 'sub'}, { 'script': 'super' }],
-                    [{ 'indent': '-1'}, { 'indent': '+1' }],
-                    [{ 'direction': 'rtl' }],
-                    [{ 'size': ['small', false, 'large', 'huge'] }],
-                    [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-                    [{ 'color': [] }, { 'background': [] }],
-                    [{ 'font': [] }],
-                    [{ 'align': [] }],
-                    ['clean'],
-                    ['link', 'image']
-                  ]
-                },
-                placeholder: '请输入HTML格式的模式描述...'
-              }"
-              style="height: 300px;"
-            />
+          <div class="html-editor-container">
+            <div class="html-editor-header">
+              <div class="editor-tabs">
+                <el-button
+                  :type="createHtmlViewMode === 'edit' ? 'primary' : 'default'"
+                  @click="createHtmlViewMode = 'edit'"
+                  size="small"
+                >
+                  <el-icon><Edit /></el-icon>
+                  编辑
+                </el-button>
+                <el-button
+                  :type="createHtmlViewMode === 'preview' ? 'primary' : 'default'"
+                  @click="createHtmlViewMode = 'preview'"
+                  size="small"
+                >
+                  <el-icon><View /></el-icon>
+                  预览
+                </el-button>
+                <el-button
+                  :type="createHtmlViewMode === 'split' ? 'primary' : 'default'"
+                  @click="createHtmlViewMode = 'split'"
+                  size="small"
+                >
+                  <el-icon><Grid /></el-icon>
+                  分栏
+                </el-button>
+              </div>
+            </div>
+            <div class="html-editor-content" :class="`mode-${createHtmlViewMode}`">
+              <!-- 编辑模式 -->
+              <div v-if="createHtmlViewMode === 'edit'" class="editor-panel full">
+                <el-input
+                  v-model="createForm.html_content"
+                  type="textarea"
+                  :rows="15"
+                  placeholder="请输入HTML代码..."
+                  class="html-code-editor"
+                />
+              </div>
+              <!-- 预览模式 -->
+              <div v-else-if="createHtmlViewMode === 'preview'" class="preview-panel full">
+                <div
+                  class="html-preview"
+                  v-html="createForm.html_content || '<p>暂无内容</p>'"
+                ></div>
+              </div>
+              <!-- 分栏模式 -->
+              <div v-else class="split-view">
+                <div class="editor-panel half">
+                  <div class="panel-title">HTML代码</div>
+                  <el-input
+                    v-model="createForm.html_content"
+                    type="textarea"
+                    :rows="13"
+                    placeholder="请输入HTML代码..."
+                    class="html-code-editor"
+                  />
+                </div>
+                <div class="preview-panel half">
+                  <div class="panel-title">预览效果</div>
+                  <div
+                    class="html-preview"
+                    v-html="createForm.html_content || '<p>暂无内容</p>'"
+                  ></div>
+                </div>
+              </div>
+            </div>
           </div>
         </el-form-item>
       </el-form>
@@ -584,11 +714,9 @@ import {
   View,
   Upload,
   Edit,
-  Check
+  Check,
 } from '@element-plus/icons-vue'
 import axios from '@/utils/axios'
-import { QuillEditor } from '@vueup/vue-quill'
-import '@vueup/vue-quill/dist/vue-quill.snow.css'
 
 const router = useRouter()
 
@@ -606,13 +734,14 @@ const defaultVisibility = ref('fully_visible')
 
 // 编辑模式相关
 const isEditMode = ref(false)
+const editHtmlViewMode = ref('edit') // 'edit', 'preview', 'split'
 const editForm = ref({
   schema_id: 0,
   html_content: '',
   schema_name: '',
   mysql_file: null as File | null,
   postgresql_file: null as File | null,
-  sql_schema: ''
+  sql_schema: '',
 })
 const editFormRef = ref()
 const editLoading = ref(false)
@@ -623,12 +752,13 @@ const pageSize = ref(1000) // 设置较大值以显示完整内容
 
 // 创建数据库模式对话框
 const createDialogVisible = ref(false)
+const createHtmlViewMode = ref('edit') // 'edit', 'preview', 'split'
 const createForm = ref({
   html_content: '',
   schema_name: '',
   mysql_file: null as File | null,
   postgresql_file: null as File | null,
-  sql_schema: ''
+  sql_schema: '',
 })
 const createFormRef = ref()
 const createLoading = ref(false)
@@ -646,7 +776,7 @@ const passwordDialogVisible = ref(false)
 const passwordForm = ref({
   oldPassword: '',
   newPassword: '',
-  confirmPassword: ''
+  confirmPassword: '',
 })
 
 // 表单引用
@@ -654,12 +784,10 @@ const passwordFormRef = ref()
 
 // 表单验证规则
 const passwordRules = {
-  oldPassword: [
-    { required: true, message: '请输入原密码', trigger: 'blur' }
-  ],
+  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' },
   ],
   confirmPassword: [
     { required: true, message: '请确认新密码', trigger: 'blur' },
@@ -671,23 +799,19 @@ const passwordRules = {
           callback()
         }
       },
-      trigger: 'blur'
-    }
-  ]
+      trigger: 'blur',
+    },
+  ],
 }
 
 // 创建数据库模式表单验证规则
 const createRules = {
   schema_name: [
     { required: true, message: '请输入数据库模式名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '名称长度在 2 到 50 个字符', trigger: 'blur' }
+    { min: 2, max: 50, message: '名称长度在 2 到 50 个字符', trigger: 'blur' },
   ],
-  sql_schema: [
-    { required: true, message: '请输入SQL模式名称', trigger: 'blur' }
-  ],
-  html_content: [
-    { required: true, message: '请输入HTML内容', trigger: 'blur' }
-  ]
+  sql_schema: [{ required: true, message: '请输入SQL模式名称', trigger: 'blur' }],
+  html_content: [{ required: true, message: '请输入HTML内容', trigger: 'blur' }],
 }
 
 // 生命周期
@@ -714,9 +838,9 @@ const fetchSchemaList = async () => {
   try {
     const response = await axios.get('/public/schema/list')
     if (response.data && Array.isArray(response.data)) {
-      schemaList.value = response.data.map(schema => ({
+      schemaList.value = response.data.map((schema) => ({
         ...schema,
-        schema_id: schema.schema_id || 1 // 确保有schema_id
+        schema_id: schema.schema_id || 1, // 确保有schema_id
       }))
     }
   } catch (error) {
@@ -739,7 +863,7 @@ const selectSchema = (schema: any) => {
 const getSchemaId = (schemaName: string) => {
   // 这里需要根据实际情况获取schema_id
   // 可能需要从API获取或者维护一个映射关系
-  const schema = schemaList.value.find(s => s.schema_name === schemaName)
+  const schema = schemaList.value.find((s) => s.schema_name === schemaName)
   return schema ? schema.schema_id || 1 : 1 // 默认返回1
 }
 
@@ -793,7 +917,7 @@ const executeQuery = async () => {
     const schemaId = getSchemaId(selectedSchema.value)
     const response = await axios.post('/teacher/schema/query', {
       schema_id: schemaId,
-      sql: sqlQuery.value
+      sql: sqlQuery.value,
     })
 
     if (response.data.code === 200) {
@@ -812,7 +936,7 @@ const executeQuery = async () => {
       // 添加到查询历史
       queryHistory.value.unshift({
         sql: sqlQuery.value,
-        time: new Date().toLocaleString()
+        time: new Date().toLocaleString(),
       })
 
       // 限制历史记录数量
@@ -881,7 +1005,7 @@ const changePassword = async () => {
 
     const response = await axios.put('/teacher/change-password', {
       old_password: passwordForm.value.oldPassword,
-      new_password: passwordForm.value.newPassword
+      new_password: passwordForm.value.newPassword,
     })
 
     if (response.data && response.data.code === 200) {
@@ -890,7 +1014,7 @@ const changePassword = async () => {
       passwordForm.value = {
         oldPassword: '',
         newPassword: '',
-        confirmPassword: ''
+        confirmPassword: '',
       }
     } else {
       ElMessage.error(response.data?.msg || '密码修改失败')
@@ -923,7 +1047,7 @@ const showCreateDialog = () => {
     schema_name: '',
     mysql_file: null,
     postgresql_file: null,
-    sql_schema: ''
+    sql_schema: '',
   }
   mysqlFileContent.value = ''
   postgresqlFileContent.value = ''
@@ -933,7 +1057,7 @@ const showCreateDialog = () => {
 const handleFileChange = (file: File, type: 'mysql' | 'postgresql') => {
   if (type === 'mysql') {
     createForm.value.mysql_file = file
-    
+
     // 读取MySQL文件内容并显示
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -945,7 +1069,7 @@ const handleFileChange = (file: File, type: 'mysql' | 'postgresql') => {
     reader.readAsText(file)
   } else if (type === 'postgresql') {
     createForm.value.postgresql_file = file
-    
+
     // 读取PostgreSQL文件内容并显示
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -956,7 +1080,7 @@ const handleFileChange = (file: File, type: 'mysql' | 'postgresql') => {
     }
     reader.readAsText(file)
   }
-  
+
   return false // 阻止自动上传
 }
 
@@ -964,7 +1088,7 @@ const handleFileChange = (file: File, type: 'mysql' | 'postgresql') => {
 const handleEditFileChange = (file: File, type: 'mysql' | 'postgresql') => {
   if (type === 'mysql') {
     editForm.value.mysql_file = file
-    
+
     // 读取MySQL文件内容并显示
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -976,7 +1100,7 @@ const handleEditFileChange = (file: File, type: 'mysql' | 'postgresql') => {
     reader.readAsText(file)
   } else if (type === 'postgresql') {
     editForm.value.postgresql_file = file
-    
+
     // 读取PostgreSQL文件内容并显示
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -987,7 +1111,7 @@ const handleEditFileChange = (file: File, type: 'mysql' | 'postgresql') => {
     }
     reader.readAsText(file)
   }
-  
+
   return false // 阻止自动上传
 }
 
@@ -1035,16 +1159,16 @@ const createSchema = async () => {
       schema_name: createForm.value.schema_name,
       sql_file_content: {
         mysql_engine: mysqlFileContent,
-        postgresql_opengauss_engine: postgresqlFileContent
+        postgresql_opengauss_engine: postgresqlFileContent,
       },
       sql_schema: createForm.value.sql_schema,
-      schema_author: teacherInfo.value.teacher_name || ''
+      schema_author: teacherInfo.value.teacher_name || '',
     }
 
     const response = await axios.post('/teacher/schema/create', requestData, {
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
     })
 
     if (response.data && response.data.code === 200) {
@@ -1106,7 +1230,7 @@ const enterEditMode = () => {
     schema_name: selectedSchemaInfo.value.schema_name,
     mysql_file: null,
     postgresql_file: null,
-    sql_schema: selectedSchemaInfo.value.schema_name // 默认使用schema_name
+    sql_schema: selectedSchemaInfo.value.schema_name, // 默认使用schema_name
   }
   // 重置文件内容显示
   editMysqlFileContent.value = ''
@@ -1122,7 +1246,7 @@ const cancelEdit = () => {
     schema_name: '',
     mysql_file: null,
     postgresql_file: null,
-    sql_schema: ''
+    sql_schema: '',
   }
   // 重置文件内容显示
   editMysqlFileContent.value = ''
@@ -1145,7 +1269,7 @@ const saveChanges = async () => {
 
     // 第一步：删除原有模式
     const deleteResponse = await axios.delete(`/teacher/schemas/${editForm.value.schema_id}`)
-    
+
     if (!deleteResponse.data || !deleteResponse.data.success) {
       ElMessage.error('删除原模式失败')
       return
@@ -1153,7 +1277,7 @@ const saveChanges = async () => {
 
     // 第二步：准备创建新模式的数据
     let sqlFileContent: any
-    
+
     if (hasNewFiles) {
       // 如果有新文件，读取新文件内容
       const mysqlContent = await new Promise<string>((resolve, reject) => {
@@ -1172,7 +1296,7 @@ const saveChanges = async () => {
 
       sqlFileContent = {
         mysql_engine: mysqlContent,
-        postgresql_opengauss_engine: postgresqlContent
+        postgresql_opengauss_engine: postgresqlContent,
       }
     } else {
       // 如果没有新文件，使用原有的文件内容（这里需要从原模式中获取）
@@ -1191,25 +1315,25 @@ const saveChanges = async () => {
       schema_name: editForm.value.schema_name,
       sql_file_content: sqlFileContent,
       sql_schema: editForm.value.sql_schema,
-      schema_author: teacherInfo.value.teacher_name || ''
+      schema_author: teacherInfo.value.teacher_name || '',
     }
 
     const createResponse = await axios.post('/teacher/schema/create', createData, {
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
     })
 
     if (createResponse.data && createResponse.data.code === 200) {
       ElMessage.success('数据库模式修改成功')
-      
+
       // 退出编辑模式
       isEditMode.value = false
-      
+
       // 清空选中状态，因为原模式已被删除
       selectedSchema.value = ''
       selectedSchemaInfo.value = null
-      
+
       // 重新获取模式列表
       await fetchSchemaList()
     } else {
@@ -1233,8 +1357,8 @@ const deleteSchema = async (schema: any) => {
         confirmButtonText: '确定删除',
         cancelButtonText: '取消',
         type: 'warning',
-        dangerouslyUseHTMLString: true
-      }
+        dangerouslyUseHTMLString: true,
+      },
     )
 
     deleteLoading.value = schema.schema_id
@@ -1243,13 +1367,13 @@ const deleteSchema = async (schema: any) => {
 
     if (response.data && response.data.success) {
       ElMessage.success(response.data.message || '数据库模式删除成功')
-      
+
       // 如果删除的是当前选中的模式，清空选中状态
       if (selectedSchema.value === schema.schema_name) {
         selectedSchema.value = ''
         selectedSchemaInfo.value = null
       }
-      
+
       // 重新获取模式列表
       await fetchSchemaList()
     } else {
@@ -1779,8 +1903,6 @@ const deleteSchema = async (schema: any) => {
   justify-content: center;
 }
 
-
-
 /* 编辑模式样式 */
 .header-actions {
   display: flex;
@@ -1932,6 +2054,127 @@ const deleteSchema = async (schema: any) => {
   border: 1px solid #dcdfe6;
   border-radius: 4px;
   overflow: hidden;
+  resize: horizontal;
+  min-width: 750px;
+  max-width: 100%;
+}
+
+.html-editor-header {
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #dcdfe6;
+  padding: 8px 12px;
+}
+
+.editor-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.html-editor-content {
+  min-height: 400px;
+}
+
+.split-view {
+  display: flex;
+  height: 100%;
+}
+
+.editor-panel.half {
+  flex: 2;
+  border-right: 1px solid #dcdfe6;
+}
+
+.preview-panel.half {
+  flex: 1;
+  border-right: 1px solid #dcdfe6;
+}
+
+.preview-panel.half {
+  border-right: none;
+  border-left: 1px solid #dcdfe6;
+}
+
+.editor-panel.full,
+.preview-panel.full {
+  width: 100%;
+  height: 100%;
+}
+
+.panel-title {
+  background-color: #f8f9fa;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e9ecef;
+  font-size: 12px;
+  font-weight: 600;
+  color: #606266;
+}
+
+.html-code-editor {
+  font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.html-code-editor .el-textarea__inner {
+  font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  border: none;
+  border-radius: 0;
+  resize: none;
+}
+
+.html-preview {
+  padding: 12px;
+  min-height: 300px;
+  background-color: #fff;
+  overflow-y: auto;
+  border: none;
+}
+
+.html-preview h1,
+.html-preview h2,
+.html-preview h3,
+.html-preview h4,
+.html-preview h5,
+.html-preview h6 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.html-preview p {
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.html-preview ul,
+.html-preview ol {
+  margin-bottom: 16px;
+  padding-left: 24px;
+}
+
+.html-preview li {
+  margin-bottom: 4px;
+}
+
+.html-preview code {
+  background-color: #f6f8fa;
+  border-radius: 3px;
+  font-size: 85%;
+  margin: 0;
+  padding: 0.2em 0.4em;
+}
+
+.html-preview pre {
+  background-color: #f6f8fa;
+  border-radius: 6px;
+  font-size: 85%;
+  line-height: 1.45;
+  overflow: auto;
+  padding: 16px;
+  margin-bottom: 16px;
 }
 
 .html-editor-container .ql-toolbar {
@@ -1981,7 +2224,7 @@ const deleteSchema = async (schema: any) => {
   .create-schema-dialog {
     width: 95% !important;
   }
-  
+
   .form-row {
     grid-template-columns: 1fr;
     gap: 12px;

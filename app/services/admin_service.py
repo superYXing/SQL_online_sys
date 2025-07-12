@@ -368,8 +368,6 @@ class AdminService:
     def delete_database_schema(self, schema_id: int, current_user: dict,
                               db: Session) -> Tuple[bool, str]:
         """删除数据库模式（同时删除三个数据库引擎的模式和表格）"""
-        # 验证管理员权限
-        self._verify_admin_role(current_user)
 
         try:
             schema = db.query(DatabaseSchema).filter(DatabaseSchema.schema_id == schema_id).first()

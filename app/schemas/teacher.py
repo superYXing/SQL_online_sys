@@ -615,9 +615,9 @@ class StudentProfileDocResponse(BaseModel):
         from_attributes = True
         json_schema_extra = {
             "example": {
-                "student_id": "20252261107",
+                "student_id": "20232261107",
                 "student_name": "刘东",
-                "class_name": "2024级7班",
+                "class_name": "2023级7班",
                 "course_id": 3,
                 "status": 0,
                 "correct_count": 1,

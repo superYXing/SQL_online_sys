@@ -4,7 +4,7 @@ from starlette.responses import RedirectResponse
 import logging
 
 # 初始化日志配置（必须在其他导入之前）
-from config.logging_config import setup_logging, get_logger
+from utils.logging_config import setup_logging, get_logger
 setup_logging()
 
 from controllers.auth_controller import auth_router
@@ -13,7 +13,7 @@ from controllers.admin_controller import admin_router
 from controllers.teacher_controller import teacher_router
 from controllers.public_controller import public_router
 from services.monitor_service import AccessMonitorMiddleware, monitor_service
-from middleware.exception_handler import GlobalExceptionHandler
+from utils.exception_handler import GlobalExceptionHandler
 
 # 获取应用日志器
 app_logger = get_logger('app')

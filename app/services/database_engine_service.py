@@ -261,17 +261,17 @@ class DatabaseEngineService:
         """
         try:
             # 提取实际的查询语句（去除USE语句和SET search_path语句）
-            def extract_query_sql(sql):
-                lines = sql.strip().split('\n')
-                query_lines = []
-                for line in lines:
-                    line = line.strip()
-                    if line and not line.upper().startswith('USE ') and not line.upper().startswith('SET SEARCH_PATH'):
-                        query_lines.append(line)
-                return '\n'.join(query_lines)
+            # def extract_query_sql(sql):
+            #     lines = sql.strip().split('\n')
+            #     query_lines = []
+            #     for line in lines:
+            #         line = line.strip()
+            #         if line and not line.upper().startswith('USE ') and not line.upper().startswith('SET SEARCH_PATH'):
+            #             query_lines.append(line)
+            #     return '\n'.join(query_lines)
 
-            student_query = extract_query_sql(student_sql)
-            answer_query = extract_query_sql(answer_sql)
+            student_query = student_sql
+            answer_query = answer_sql
 
             # 去除末尾分号
             if student_query.endswith(";"):

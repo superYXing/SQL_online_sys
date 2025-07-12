@@ -9,10 +9,11 @@
           <el-button type="text" @click="goToDashboard" class="nav-btn">数据面板</el-button>
         </div>
       </div>
-            <div class="header-right">
+      <div class="header-right">
         <el-dropdown @command="handleCommand" trigger="click">
           <span class="username-dropdown">
-            {{ studentInfo['姓名'] || '未登录' }} <el-icon class="el-icon--right"><arrow-down /></el-icon>
+            {{ studentInfo['姓名'] || '未登录' }}
+            <el-icon class="el-icon--right"><arrow-down /></el-icon>
           </span>
           <template #dropdown>
             <el-dropdown-menu>
@@ -31,7 +32,9 @@
           <!-- 左侧：数据库模式列表 -->
           <div class="left-panel">
             <div class="panel-header">
-              <h3><el-icon><DataAnalysis /></el-icon> 数据库模式</h3>
+              <h3>
+                <el-icon><DataAnalysis /></el-icon> 数据库模式
+              </h3>
             </div>
             <div class="schema-list">
               <div
@@ -50,7 +53,9 @@
           <!-- 中间：可用题目列表 -->
           <div class="middle-panel" v-if="selectedSchema && !selectedProblem">
             <div class="problems-section">
-              <h3><el-icon><Files /></el-icon> 可用题目列表</h3>
+              <h3>
+                <el-icon><Files /></el-icon> 可用题目列表
+              </h3>
               <div class="problem-list">
                 <div
                   v-for="(problem, index) in currentProblems"
@@ -60,11 +65,16 @@
                 >
                   <div class="problem-header">
                     <span class="problem-number">NO.{{ index + 1 }}</span>
-                    <span class="problem-status" :class="problem.is_required ? 'required' : 'optional'">
+                    <span
+                      class="problem-status"
+                      :class="problem.is_required ? 'required' : 'optional'"
+                    >
                       {{ problem.is_required ? '必做题' : '选做题' }}
                     </span>
                   </div>
-                  <div class="problem-title">{{ problem.problem_title || `题目 ${index + 1}` }}</div>
+                  <div class="problem-title">
+                    {{ problem.problem_title || `题目 ${index + 1}` }}
+                  </div>
                   <div class="problem-meta">
                     <span class="problem-date">{{ formatDate(new Date()) }}</span>
                   </div>
@@ -83,7 +93,9 @@
 
               <!-- 描述部分 -->
               <div class="schema-description" v-if="selectedSchemaInfo">
-                <h3><el-icon><CollectionTag /></el-icon> 模式描述</h3>
+                <h3>
+                  <el-icon><CollectionTag /></el-icon> 模式描述
+                </h3>
                 <div v-html="selectedSchemaInfo.schema_description"></div>
               </div>
             </div>
@@ -132,21 +144,22 @@
                   </el-select>
                 </div>
               </div>
-                            <div class="editor-container">
-                <Codemirror
-                  v-model:value="sqlCode"
-                  :options="cmOptions"
-                  border
-                  height="200"
-                />
+              <div class="editor-container">
+                <Codemirror v-model:value="sqlCode" :options="cmOptions" border height="200" />
               </div>
               <div class="editor-actions">
                 <!-- 提交结果消息显示区域 -->
-                <div v-if="submitMessage" class="submit-message-inline" :class="`submit-message-${submitMessageType}`">
+                <div
+                  v-if="submitMessage"
+                  class="submit-message-inline"
+                  :class="`submit-message-${submitMessageType}`"
+                >
                   {{ submitMessage }}
                 </div>
                 <div class="action-buttons">
-                  <el-button type="primary" @click="submitSQL" :loading="submitting">提交</el-button>
+                  <el-button type="primary" @click="submitSQL" :loading="submitting"
+                    >提交</el-button
+                  >
                   <el-button @click="clearSQL">清空</el-button>
                 </div>
               </div>
@@ -155,10 +168,8 @@
             <!-- 答题记录 -->
             <div class="answer-records">
               <h4>答题记录</h4>
-              <div v-if="answerRecords.length === 0" class="no-records">
-                暂无答题记录
-              </div>
-              <div v-else class="records-list">
+              <!-- 移除暂无答题记录的提示 -->
+              <div v-if="answerRecords.length > 0" class="records-list">
                 <div
                   v-for="record in answerRecords"
                   :key="record.answer_record_id"
@@ -167,10 +178,7 @@
                   <div class="record-header">
                     <span class="record-id">#{{ record.answer_record_id }}</span>
                     <span class="record-time">{{ record.timestep }}</span>
-                    <span
-                      class="record-status"
-                      :class="getStatusClass(record.result_type)"
-                    >
+                    <span class="record-status" :class="getStatusClass(record.result_type)">
                       {{ getStatusText(record.result_type) }}
                     </span>
                   </div>
@@ -276,10 +284,13 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="closeAiDialog">关闭</el-button>
-          <el-button 
-            v-if="!aiAnalyzing && aiAnalysisResult && currentAnalyzingRecord" 
-            type="primary" 
-            @click="currentAnalyzingRecord.aiAnalysis = aiAnalysisResult; closeAiDialog()"
+          <el-button
+            v-if="!aiAnalyzing && aiAnalysisResult && currentAnalyzingRecord"
+            type="primary"
+            @click="
+              currentAnalyzingRecord.aiAnalysis = aiAnalysisResult;
+              closeAiDialog();
+            "
           >
             保存到记录
           </el-button>
@@ -308,9 +319,20 @@ import {
   ElSelect,
   ElOption,
   type FormInstance,
-  type FormRules
+  type FormRules,
 } from 'element-plus'
-import { ArrowDown, ArrowLeft, DataAnalysis, Files, CollectionTag, Loading, SuccessFilled, CircleCloseFilled, WarningFilled, Close } from '@element-plus/icons-vue'
+import {
+  ArrowDown,
+  ArrowLeft,
+  DataAnalysis,
+  Files,
+  CollectionTag,
+  Loading,
+  SuccessFilled,
+  CircleCloseFilled,
+  WarningFilled,
+  Close,
+} from '@element-plus/icons-vue'
 import Codemirror from 'codemirror-editor-vue3'
 import 'codemirror/mode/sql/sql.js'
 import 'codemirror/theme/dracula.css'
@@ -363,7 +385,7 @@ const passwordFormRef = ref<FormInstance>()
 const passwordForm = ref({
   oldPassword: '',
   newPassword: '',
-  confirmPassword: ''
+  confirmPassword: '',
 })
 
 // AI分析对话框相关
@@ -382,17 +404,15 @@ const validateConfirmPassword = (rule: any, value: string, callback: any) => {
 }
 
 const passwordRules: FormRules = {
-  oldPassword: [
-    { required: true, message: '请输入原密码', trigger: 'blur' }
-  ],
+  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 6, max: 50, message: '密码长度必须在 6 到 50 个字符之间', trigger: 'blur' }
+    { min: 6, max: 50, message: '密码长度必须在 6 到 50 个字符之间', trigger: 'blur' },
   ],
   confirmPassword: [
     { required: true, message: '请确认新密码', trigger: 'blur' },
-    { validator: validateConfirmPassword, trigger: 'blur' }
-  ]
+    { validator: validateConfirmPassword, trigger: 'blur' },
+  ],
 }
 
 // 页面初始化
@@ -448,7 +468,7 @@ const selectSchema = (schema: any) => {
   answerRecords.value = []
 
   // 找到对应的题目列表
-  const schemaData = allProblemsData.value.find(item => item.schema_name === schema.schema_name)
+  const schemaData = allProblemsData.value.find((item) => item.schema_name === schema.schema_name)
   if (schemaData && schemaData.problems) {
     currentProblems.value = schemaData.problems
   } else {
@@ -474,7 +494,7 @@ const backToSchema = () => {
 const fetchProblemStats = async (problemId: number) => {
   try {
     const response = await axios.get('/teacher/problem/summary', {
-      params: { problem_id: problemId }
+      params: { problem_id: problemId },
     })
     if (response.data && response.data.data) {
       problemStats.value = response.data.data
@@ -489,7 +509,7 @@ const fetchProblemStats = async (problemId: number) => {
 const fetchAnswerRecords = async (problemId: number) => {
   try {
     const response = await axios.get('/student/answers', {
-      params: { problem_id: problemId }
+      params: { problem_id: problemId },
     })
     if (response.data && response.data.records) {
       answerRecords.value = response.data.records
@@ -497,9 +517,8 @@ const fetchAnswerRecords = async (problemId: number) => {
       answerRecords.value = []
     }
   } catch (error) {
-    console.error('获取答题记录失败:', error)
+    // 未找到答题记录是正常情况，不显示任何错误提示
     answerRecords.value = []
-    // 不显示错误提示，这是正常情况
   }
 }
 
@@ -520,7 +539,7 @@ const submitSQL = async () => {
     const response = await axios.post('/student/answer/submit', {
       problem_id: selectedProblem.value.problem_id,
       answer_content: sqlCode.value,
-      engine_type: selectedEngine.value
+      engine_type: selectedEngine.value,
     })
 
     if (response.data) {
@@ -563,20 +582,28 @@ const formatDate = (date: Date) => {
 // 获取状态样式类
 const getStatusClass = (resultType: number) => {
   switch (resultType) {
-    case 0: return 'success'
-    case 1: return 'syntax-error'
-    case 2: return 'result-error'
-    default: return ''
+    case 0:
+      return 'success'
+    case 1:
+      return 'syntax-error'
+    case 2:
+      return 'result-error'
+    default:
+      return ''
   }
 }
 
 // 获取状态文本
 const getStatusText = (resultType: number) => {
   switch (resultType) {
-    case 0: return '正确'
-    case 1: return '语法错误'
-    case 2: return '结果错误'
-    default: return '未知'
+    case 0:
+      return '正确'
+    case 1:
+      return '语法错误'
+    case 2:
+      return '结果错误'
+    default:
+      return '未知'
   }
 }
 
@@ -607,12 +634,12 @@ const analyzeWithAI = async (record: any) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         problem_id: selectedProblem.value.problem_id,
-        answer_content: record.answer_content
-      })
+        answer_content: record.answer_content,
+      }),
     })
 
     if (!response.ok) {
@@ -661,7 +688,6 @@ const analyzeWithAI = async (record: any) => {
         }
       }
     }
-
   } catch (error) {
     console.error('AI分析失败:', error)
     aiAnalysisResult.value = 'AI分析失败，请稍后重试'
@@ -708,7 +734,7 @@ const changePassword = async () => {
 
     await axios.put('/auth/password', {
       old_password: passwordForm.value.oldPassword,
-      new_password: passwordForm.value.newPassword
+      new_password: passwordForm.value.newPassword,
     })
 
     ElMessage.success('密码修改成功')
@@ -744,7 +770,7 @@ const handleLogout = async () => {
     await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: 'warning',
     })
 
     try {
@@ -769,7 +795,7 @@ const resetPasswordForm = () => {
   passwordForm.value = {
     oldPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
   }
   if (passwordFormRef.value) {
     passwordFormRef.value.clearValidate()
@@ -965,7 +991,9 @@ const resetPasswordForm = () => {
 }
 
 /* 左侧面板 */
-.left-panel, .middle-panel, .right-panel {
+.left-panel,
+.middle-panel,
+.right-panel {
   background-color: #ffffff;
   border-radius: 12px;
   overflow: hidden;
@@ -1001,7 +1029,9 @@ const resetPasswordForm = () => {
   padding: 16px 20px;
   cursor: pointer;
   border-bottom: 1px solid #f0f0f0;
-  transition: background-color 0.3s, border-left 0.3s;
+  transition:
+    background-color 0.3s,
+    border-left 0.3s;
   border-left: 4px solid transparent;
 }
 
@@ -1435,8 +1465,6 @@ const resetPasswordForm = () => {
 .sql-textarea {
   font-family: 'Courier New', monospace;
 }
-
-
 
 /* 答题记录 */
 .answer-records {

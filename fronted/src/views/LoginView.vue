@@ -15,8 +15,8 @@
       <div class="role-selection">
         <h2 class="selection-title">选择登录身份</h2>
         <div class="role-cards">
-          <div 
-            class="role-card" 
+          <div
+            class="role-card"
             :class="{ active: loginForm.role === 'student' }"
             @click="selectRole('student')"
           >
@@ -29,8 +29,8 @@
             </div>
           </div>
 
-          <div 
-            class="role-card" 
+          <div
+            class="role-card"
             :class="{ active: loginForm.role === 'teacher' }"
             @click="selectRole('teacher')"
           >
@@ -43,8 +43,8 @@
             </div>
           </div>
 
-          <div 
-            class="role-card" 
+          <div
+            class="role-card"
             :class="{ active: loginForm.role === 'admin' }"
             @click="selectRole('admin')"
           >
@@ -71,7 +71,7 @@
             </div>
             <h2>{{ getRoleTitle() }}登录</h2>
           </div>
-          
+
           <el-form
             ref="loginFormRef"
             :model="loginForm"
@@ -139,14 +139,7 @@ import { ref, reactive } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useRouter } from 'vue-router'
 import axios from '@/utils/axios'
-import {
-  User,
-  Lock,
-  Setting,
-  DataBoard,
-  Reading,
-  Check
-} from '@element-plus/icons-vue'
+import { User, Lock, Setting, DataBoard, Reading, Check } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const loginFormRef = ref<FormInstance>()
@@ -157,22 +150,20 @@ const rememberPassword = ref(false)
 const loginForm = reactive({
   account: '',
   password: '',
-  role: 'student'
+  role: 'student',
 })
 
 // 表单验证规则
 const loginRules: FormRules = {
-  role: [
-    { required: true, message: '请选择登录身份', trigger: 'change' }
-  ],
+  role: [{ required: true, message: '请选择登录身份', trigger: 'change' }],
   account: [
     { required: true, message: '请输入账号', trigger: 'blur' },
-    { min: 1, max: 50, message: '账号长度在 1 到 50 个字符', trigger: 'blur' }
+    { min: 1, max: 50, message: '账号长度在 1 到 50 个字符', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 1, max: 100, message: '密码长度在 1 到 100 个字符', trigger: 'blur' }
-  ]
+    { min: 1, max: 100, message: '密码长度在 1 到 100 个字符', trigger: 'blur' },
+  ],
 }
 
 // 选择角色
@@ -214,28 +205,28 @@ const getAccountPlaceholder = () => {
 // 处理登录
 const handleLogin = async () => {
   if (!loginFormRef.value) return
-  
+
   try {
     // 表单验证
     await loginFormRef.value.validate()
-    
+
     loading.value = true
-    
+
     // 调用登录接口
     const response = await axios.post('/auth/login', {
       account: loginForm.account,
       password: loginForm.password,
-      role: loginForm.role
+      role: loginForm.role,
     })
-    
+
     if (response.data.code === 200) {
       // 登录成功
       ElMessage.success(response.data.message || '登录成功')
-      
+
       // 保存token和用户信息
       localStorage.setItem('token', response.data.data.token)
       localStorage.setItem('userInfo', JSON.stringify(response.data.data.user))
-      
+
       // 根据角色跳转到不同页面
       if (loginForm.role === 'admin') {
         router.push('/admin/semester')
@@ -278,14 +269,29 @@ const handleLogin = async () => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 20%), url('@/assets/login.png');
- 
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
   margin: 0;
   padding: 0;
   overflow: hidden;
+  background-image: url('@/assets/login(1).jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.login-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 136, 153, 0.3);
+  z-index: 1;
+}
+
+.login-container > * {
+  position: relative;
+  z-index: 2;
 }
 
 /* 顶部标题区域 */
@@ -521,15 +527,15 @@ const handleLogin = async () => {
     gap: 20px;
     padding: 20px 16px;
   }
-  
+
   .login-form-section {
     flex: none;
   }
-  
+
   .login-box {
     padding: 24px;
   }
-  
+
   .platform-title {
     font-size: 24px;
   }

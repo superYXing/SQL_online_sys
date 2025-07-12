@@ -8,13 +8,16 @@
           <el-button type="text" @click="goToDashboard" class="nav-btn">数据面板</el-button>
           <el-button type="text" @click="goToDatabaseSchema" class="nav-btn">数据库模式</el-button>
           <el-button type="text" @click="goToProblem" class="nav-btn">题目</el-button>
-          <el-button type="text" @click="goToStudentInfo" class="nav-btn active">学生信息</el-button>
+          <el-button type="text" @click="goToStudentInfo" class="nav-btn active"
+            >学生信息</el-button
+          >
         </div>
       </div>
       <div class="header-right">
         <el-dropdown @command="handleCommand" trigger="click">
           <span class="username-dropdown">
-            {{ teacherInfo.teacher_name || '加载中...' }} <el-icon class="el-icon--right"><arrow-down /></el-icon>
+            {{ teacherInfo.teacher_name || '加载中...' }}
+            <el-icon class="el-icon--right"><arrow-down /></el-icon>
           </span>
           <template #dropdown>
             <el-dropdown-menu>
@@ -37,18 +40,25 @@
                 <el-icon><ArrowLeft /></el-icon>
                 返回
               </el-button>
-              <h3><el-icon><Calendar /></el-icon> 选择一个学期</h3>
+              <h3>
+                <el-icon><Calendar /></el-icon> 选择一个学期
+              </h3>
             </div>
             <div class="semester-list">
               <div
                 v-for="semester in semesterList"
                 :key="semester.semester_id"
                 class="semester-item"
-                :class="{ active: selectedSemester === semester.semester_id, current: semester.is_current }"
+                :class="{
+                  active: selectedSemester === semester.semester_id,
+                  current: semester.is_current,
+                }"
                 @click="selectSemester(semester)"
               >
                 <div class="semester-name">{{ semester.semester_name }}</div>
-                <div class="semester-date">{{ semester.begin_date }} 至 {{ semester.end_date }}</div>
+                <div class="semester-date">
+                  {{ semester.begin_date }} 至 {{ semester.end_date }}
+                </div>
                 <div v-if="semester.is_current" class="current-tag">当前学期</div>
               </div>
             </div>
@@ -57,13 +67,21 @@
           <!-- 中间：添加选课记录（选择学期后显示） -->
           <div class="middle-panel" v-if="selectedSemester">
             <div class="panel-header">
-              <h3><el-icon><Plus /></el-icon> 添加选课记录</h3>
+              <h3>
+                <el-icon><Plus /></el-icon> 添加选课记录
+              </h3>
             </div>
 
             <!-- 手动导入 -->
             <div class="import-section">
               <h4>手动导入</h4>
-              <el-form :model="studentForm" :rules="studentFormRules" ref="studentFormRef" label-width="80px" size="small">
+              <el-form
+                :model="studentForm"
+                :rules="studentFormRules"
+                ref="studentFormRef"
+                label-width="80px"
+                size="small"
+              >
                 <el-form-item label="学号" prop="student_id">
                   <el-input v-model="studentForm.student_id" placeholder="请输入学号" />
                 </el-form-item>
@@ -80,10 +98,16 @@
                   </el-select>
                 </el-form-item>
                 <el-form-item label="课程ID" prop="course_id">
-                  <el-input v-model="studentForm.course_id" placeholder="请输入课程ID" type="number" />
+                  <el-input
+                    v-model="studentForm.course_id"
+                    placeholder="请输入课程ID"
+                    type="number"
+                  />
                 </el-form-item>
                 <el-form-item>
-                  <el-button type="primary" @click="addStudent" :loading="addingStudent">添加</el-button>
+                  <el-button type="primary" @click="addStudent" :loading="addingStudent"
+                    >添加</el-button
+                  >
                   <el-button @click="resetStudentForm">重置</el-button>
                 </el-form-item>
               </el-form>
@@ -105,15 +129,27 @@
                   <el-button size="small" type="primary">选择Excel文件</el-button>
                   <template #tip>
                     <div class="el-upload__tip">
-                      只能上传xlsx/xls文件，且不超过500kb<br>
-                      Excel模板字段：student_id(学号), student_name(姓名), class_(班级), status(状态：0=正常，1=重修), course_id(课程ID)
+                      只能上传xlsx/xls文件，且不超过500kb<br />
+                      Excel模板字段：student_id(学号), student_name(姓名), class_(班级),
+                      status(状态：0=正常，1=重修), course_id(课程ID)<br />
+                      <strong>模板数据示例：</strong><br />
+                      <code
+                        style="
+                          font-size: 12px;
+                          background: #f5f5f5;
+                          padding: 2px 4px;
+                          border-radius: 3px;
+                        "
+                      >
+                        student_id: 202322511772, student_name: 张三零, class_: 23级1班, status: 0,
+                        course_id: 1<br />
+                        student_id: 202346511822, student_name: 李四飒, class_: 23级1班, status: 1,
+                        course_id: 1
+                      </code>
                     </div>
                   </template>
                 </el-upload>
-                <el-button type="success" @click="importStudents" :loading="importing" class="import-btn">
-                  <el-icon><Upload /></el-icon>
-                  解析文件
-                </el-button>
+
                 <el-button type="info" @click="downloadTemplate" class="template-btn">
                   <el-icon><Download /></el-icon>
                   下载模板
@@ -125,7 +161,9 @@
           <!-- 右侧：学生选课记录表（选择学期后显示） -->
           <div class="right-panel" v-if="selectedSemester">
             <div class="panel-header">
-              <h3><el-icon><User /></el-icon> 学生选课记录</h3>
+              <h3>
+                <el-icon><User /></el-icon> 学生选课记录
+              </h3>
               <div class="search-box">
                 <el-input
                   v-model="searchKeyword"
@@ -214,7 +252,12 @@
 
     <!-- 编辑学生对话框 -->
     <el-dialog v-model="editStudentVisible" title="编辑学生信息" width="500px">
-      <el-form :model="editStudentForm" :rules="editStudentRules" ref="editStudentFormRef" label-width="100px">
+      <el-form
+        :model="editStudentForm"
+        :rules="editStudentRules"
+        ref="editStudentFormRef"
+        label-width="100px"
+      >
         <el-form-item label="学号">
           <el-input v-model="editStudentForm.student_id" disabled />
         </el-form-item>
@@ -225,20 +268,31 @@
           <el-input v-model="editStudentForm.class_" placeholder="请输入班级" />
         </el-form-item>
         <el-form-item label="新密码" prop="student_password">
-          <el-input v-model="editStudentForm.student_password" type="password" placeholder="留空则不修改密码" />
+          <el-input
+            v-model="editStudentForm.student_password"
+            type="password"
+            placeholder="留空则不修改密码"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="editStudentVisible = false">取消</el-button>
-          <el-button type="primary" @click="updateStudent" :loading="updatingStudent">确认</el-button>
+          <el-button type="primary" @click="updateStudent" :loading="updatingStudent"
+            >确认</el-button
+          >
         </div>
       </template>
     </el-dialog>
 
     <!-- 修改密码对话框 -->
     <el-dialog v-model="passwordDialogVisible" title="修改密码" width="400px">
-      <el-form :model="passwordForm" :rules="passwordRules" ref="passwordFormRef" label-width="100px">
+      <el-form
+        :model="passwordForm"
+        :rules="passwordRules"
+        ref="passwordFormRef"
+        label-width="100px"
+      >
         <el-form-item label="原密码" prop="oldPassword">
           <el-input v-model="passwordForm.oldPassword" type="password" show-password />
         </el-form-item>
@@ -258,60 +312,88 @@
     </el-dialog>
 
     <!-- 解析数据预览对话框 -->
-    <el-dialog v-model="showParsedData" title="批量导入预览" width="90%" :close-on-click-modal="false">
+    <el-dialog
+      v-model="showParsedData"
+      title="批量导入预览"
+      width="90%"
+      :close-on-click-modal="false"
+    >
       <div class="parsed-data-container">
         <div class="parsed-header">
           <span>共解析到 {{ parsedStudents.length }} 条学生记录，请检查并修改数据后确认导入</span>
         </div>
-        
+
         <el-table :data="parsedStudents" border stripe max-height="400" class="parsed-table">
           <el-table-column type="index" label="序号" width="60" />
           <el-table-column label="学号" width="120">
             <template #default="scope">
-              <el-input 
-                v-if="scope.row._editing" 
-                v-model="scope.row.student_id" 
+              <el-input
+                v-if="scope.row._editing"
+                v-model="scope.row.student_id"
                 size="small"
-                :class="{ 'error-input': !scope.row._valid && scope.row._errors.includes('学号不能为空') }"
+                :class="{
+                  'error-input': !scope.row._valid && scope.row._errors.includes('学号不能为空'),
+                }"
               />
-              <span v-else :class="{ 'error-text': !scope.row._valid && scope.row._errors.includes('学号不能为空') }">
+              <span
+                v-else
+                :class="{
+                  'error-text': !scope.row._valid && scope.row._errors.includes('学号不能为空'),
+                }"
+              >
                 {{ scope.row.student_id }}
               </span>
             </template>
           </el-table-column>
           <el-table-column label="姓名" width="100">
             <template #default="scope">
-              <el-input 
-                v-if="scope.row._editing" 
-                v-model="scope.row.student_name" 
+              <el-input
+                v-if="scope.row._editing"
+                v-model="scope.row.student_name"
                 size="small"
-                :class="{ 'error-input': !scope.row._valid && scope.row._errors.includes('姓名不能为空') }"
+                :class="{
+                  'error-input': !scope.row._valid && scope.row._errors.includes('姓名不能为空'),
+                }"
               />
-              <span v-else :class="{ 'error-text': !scope.row._valid && scope.row._errors.includes('姓名不能为空') }">
+              <span
+                v-else
+                :class="{
+                  'error-text': !scope.row._valid && scope.row._errors.includes('姓名不能为空'),
+                }"
+              >
                 {{ scope.row.student_name }}
               </span>
             </template>
           </el-table-column>
           <el-table-column label="班级" width="150">
             <template #default="scope">
-              <el-input 
-                v-if="scope.row._editing" 
-                v-model="scope.row.class_" 
+              <el-input
+                v-if="scope.row._editing"
+                v-model="scope.row.class_"
                 size="small"
-                :class="{ 'error-input': !scope.row._valid && scope.row._errors.includes('班级不能为空') }"
+                :class="{
+                  'error-input': !scope.row._valid && scope.row._errors.includes('班级不能为空'),
+                }"
               />
-              <span v-else :class="{ 'error-text': !scope.row._valid && scope.row._errors.includes('班级不能为空') }">
+              <span
+                v-else
+                :class="{
+                  'error-text': !scope.row._valid && scope.row._errors.includes('班级不能为空'),
+                }"
+              >
                 {{ scope.row.class_ }}
               </span>
             </template>
           </el-table-column>
           <el-table-column label="状态" width="100">
             <template #default="scope">
-              <el-select 
-                v-if="scope.row._editing" 
-                v-model="scope.row.status" 
+              <el-select
+                v-if="scope.row._editing"
+                v-model="scope.row.status"
                 size="small"
-                :class="{ 'error-input': !scope.row._valid && scope.row._errors.includes('状态必须为0或1') }"
+                :class="{
+                  'error-input': !scope.row._valid && scope.row._errors.includes('状态必须为0或1'),
+                }"
               >
                 <el-option label="正常" :value="0" />
                 <el-option label="重修" :value="1" />
@@ -323,14 +405,21 @@
           </el-table-column>
           <el-table-column label="课程ID" width="100">
             <template #default="scope">
-              <el-input 
-                v-if="scope.row._editing" 
-                v-model="scope.row.course_id" 
-                size="small" 
+              <el-input
+                v-if="scope.row._editing"
+                v-model="scope.row.course_id"
+                size="small"
                 type="number"
-                :class="{ 'error-input': !scope.row._valid && scope.row._errors.includes('课程ID不能为空') }"
+                :class="{
+                  'error-input': !scope.row._valid && scope.row._errors.includes('课程ID不能为空'),
+                }"
               />
-              <span v-else :class="{ 'error-text': !scope.row._valid && scope.row._errors.includes('课程ID不能为空') }">
+              <span
+                v-else
+                :class="{
+                  'error-text': !scope.row._valid && scope.row._errors.includes('课程ID不能为空'),
+                }"
+              >
                 {{ scope.row.course_id }}
               </span>
             </template>
@@ -365,12 +454,12 @@
           </el-table-column>
         </el-table>
       </div>
-      
+
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="cancelBatchImport">取消</el-button>
           <el-button type="primary" @click="confirmBatchImport" :loading="batchImporting">
-            确认导入 ({{ parsedStudents.filter(s => s._valid).length }} 条有效记录)
+            确认导入 ({{ parsedStudents.filter((s) => s._valid).length }} 条有效记录)
           </el-button>
         </div>
       </template>
@@ -393,7 +482,7 @@ import {
   Search,
   Edit,
   Check,
-  Close
+  Close,
 } from '@element-plus/icons-vue'
 import axios from '@/utils/axios'
 import AdminService from '@/utils/adminService'
@@ -425,7 +514,7 @@ const studentForm = ref({
   student_name: '',
   class_: '',
   status: 0,
-  course_id: ''
+  course_id: '',
 })
 
 // 表单引用
@@ -446,7 +535,7 @@ const passwordDialogVisible = ref(false)
 const passwordForm = ref({
   oldPassword: '',
   newPassword: '',
-  confirmPassword: ''
+  confirmPassword: '',
 })
 const passwordFormRef = ref()
 
@@ -458,7 +547,7 @@ const studentDetail = ref({
   student_id: '',
   student_name: '',
   class_: '',
-  course_id: ''
+  course_id: '',
 })
 
 // 编辑学生相关
@@ -468,17 +557,15 @@ const editStudentForm = ref({
   student_id: '',
   student_name: '',
   class_: '',
-  student_password: ''
+  student_password: '',
 })
 
 // 表单验证规则
 const passwordRules = {
-  oldPassword: [
-    { required: true, message: '请输入原密码', trigger: 'blur' }
-  ],
+  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' },
   ],
   confirmPassword: [
     { required: true, message: '请确认新密码', trigger: 'blur' },
@@ -490,36 +577,22 @@ const passwordRules = {
           callback()
         }
       },
-      trigger: 'blur'
-    }
-  ]
+      trigger: 'blur',
+    },
+  ],
 }
 
 const studentFormRules = {
-  student_id: [
-    { required: true, message: '请输入学号', trigger: 'blur' }
-  ],
-  student_name: [
-    { required: true, message: '请输入姓名', trigger: 'blur' }
-  ],
-  class_: [
-    { required: true, message: '请输入班级', trigger: 'blur' }
-  ],
-  status: [
-    { required: true, message: '请选择状态', trigger: 'change' }
-  ],
-  course_id: [
-    { required: true, message: '请输入课程ID', trigger: 'blur' }
-  ]
+  student_id: [{ required: true, message: '请输入学号', trigger: 'blur' }],
+  student_name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+  class_: [{ required: true, message: '请输入班级', trigger: 'blur' }],
+  status: [{ required: true, message: '请选择状态', trigger: 'change' }],
+  course_id: [{ required: true, message: '请输入课程ID', trigger: 'blur' }],
 }
 
 const editStudentRules = {
-  student_name: [
-    { required: true, message: '请输入姓名', trigger: 'blur' }
-  ],
-  class_: [
-    { required: true, message: '请输入班级', trigger: 'blur' }
-  ]
+  student_name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+  class_: [{ required: true, message: '请输入班级', trigger: 'blur' }],
 }
 
 // 生命周期
@@ -571,7 +644,7 @@ const fetchStudents = async () => {
       page: currentPage.value,
       limit: pageSize.value,
       semester_id: selectedSemester.value,
-      search: searchKeyword.value
+      search: searchKeyword.value,
     }
 
     const response = await axios.get('/teacher/students', { params })
@@ -595,8 +668,8 @@ const addStudent = async () => {
     await studentFormRef.value.validate()
 
     addingStudent.value = true
-    // 使用对象格式发送数据
-    const response = await axios.post('/teacher/students/addcourse', { students: [studentForm.value] })
+    // 直接发送学生数组
+    const response = await axios.post('/teacher/students/addcourse', [studentForm.value])
     if (response.data && response.data.code === 200) {
       ElMessage.success(response.data.msg || '添加学生成功')
       resetStudentForm()
@@ -621,7 +694,7 @@ const resetStudentForm = () => {
     student_name: '',
     class_: '',
     status: 0,
-    course_id: ''
+    course_id: '',
   }
   if (studentFormRef.value) {
     studentFormRef.value.clearValidate()
@@ -644,12 +717,13 @@ const parseExcelFile = (file: File) => {
       const sheetName = workbook.SheetNames[0]
       const worksheet = workbook.Sheets[sheetName]
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
-      
+
       // 解析数据，跳过表头
       const students: any[] = []
       for (let i = 1; i < jsonData.length; i++) {
         const row = jsonData[i] as any[]
-        if (row.length >= 5 && row[0]) { // 确保有足够的列且学号不为空
+        if (row.length >= 5 && row[0]) {
+          // 确保有足够的列且学号不为空
           students.push({
             student_id: String(row[0] || ''),
             student_name: String(row[1] || ''),
@@ -658,16 +732,16 @@ const parseExcelFile = (file: File) => {
             course_id: Number(row[4]) || selectedSemester.value || 0,
             _editing: false,
             _valid: true,
-            _errors: []
+            _errors: [],
           })
         }
       }
-      
+
       if (students.length === 0) {
         ElMessage.warning('Excel文件中没有找到有效的学生数据')
         return
       }
-      
+
       parsedStudents.value = students
       showParsedData.value = true
       ElMessage.success(`成功解析 ${students.length} 条学生记录`)
@@ -704,7 +778,7 @@ const confirmBatchImport = async () => {
   }
 
   // 验证数据
-  const validStudents = parsedStudents.value.filter(student => {
+  const validStudents = parsedStudents.value.filter((student) => {
     student._errors = []
     student._valid = true
 
@@ -745,41 +819,89 @@ const confirmBatchImport = async () => {
       {
         confirmButtonText: '确定导入',
         cancelButtonText: '取消',
-        type: 'warning'
-      }
+        type: 'warning',
+      },
     ).catch(() => false)
-    
+
     if (!result) return
   }
 
   batchImporting.value = true
   try {
-    // 根据新的API规范，将学生数组包装在对象中发送
-    const studentsData = validStudents.map(student => ({
+    // 直接发送学生数组
+    const studentsData = validStudents.map((student) => ({
       student_id: student.student_id,
       student_name: student.student_name,
       class_: student.class_,
       status: student.status,
-      course_id: student.course_id
+      course_id: student.course_id,
     }))
-    
-    const response = await axios.post('/teacher/students/addcourse', { students: studentsData })
 
-    if (response.data && response.data.code === 200) {
-      ElMessage.success(response.data.msg || `批量导入成功！成功导入 ${validStudents.length} 条记录`)
-      // 清空数据
-      uploadRef.value?.clearFiles()
-      uploadFile.value = null
-      parsedStudents.value = []
-      showParsedData.value = false
-      // 刷新列表
-      fetchStudents()
+    const response = await axios.post('/teacher/students/addcourse', studentsData)
+
+    // 根据后端返回的状态码处理不同情况
+    if (response.data) {
+      const { code, msg } = response.data
+
+      if (code === 200) {
+        // 全部成功 (code: 200)
+        ElMessage.success(msg || '批量导入成功')
+
+        // 清空数据并刷新列表
+        uploadRef.value?.clearFiles()
+        uploadFile.value = null
+        parsedStudents.value = []
+        showParsedData.value = false
+        fetchStudents()
+      } else if (code === 206) {
+        // 部分成功 (code: 206)
+        const detailMessage = msg || '部分导入成功'
+
+        await ElMessageBox.alert(detailMessage, '导入结果详情', {
+          confirmButtonText: '确定',
+          type: 'warning',
+          dangerouslyUseHTMLString: false,
+        })
+
+        // 清空数据并刷新列表
+        uploadRef.value?.clearFiles()
+        uploadFile.value = null
+        parsedStudents.value = []
+        showParsedData.value = false
+        fetchStudents()
+      } else {
+        // 其他错误情况
+        ElMessage.error(msg || '批量导入失败')
+      }
     } else {
-      ElMessage.error(response.data?.msg || '批量导入失败')
+      ElMessage.error('批量导入失败：服务器响应异常')
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('批量导入失败:', error)
-    ElMessage.error('批量导入失败')
+
+    // 处理HTTP错误响应
+    if (error.response?.data) {
+      const { code, msg } = error.response.data
+
+      if (code === 400) {
+        // 全部失败 (code: 400)
+        const detailMessage = msg || '批量导入失败'
+
+        await ElMessageBox.alert(detailMessage, '导入失败详情', {
+          confirmButtonText: '确定',
+          type: 'error',
+          dangerouslyUseHTMLString: false,
+        })
+      } else if (error.response.data.detail) {
+        // 其他详细错误信息
+        ElMessage.error(error.response.data.detail)
+      } else {
+        // 使用返回的消息或默认消息
+        ElMessage.error(msg || '批量导入失败')
+      }
+    } else {
+      ElMessage.error('批量导入失败：网络错误或服务器无响应')
+    }
   } finally {
     batchImporting.value = false
   }
@@ -848,20 +970,20 @@ const downloadTemplate = () => {
   const wb = XLSX.utils.book_new()
   const wsData = [
     ['student_id', 'student_name', 'class_', 'status', 'course_id'],
-    ['20232251177', '张三', '计算机科学与技术1班', 0, 10],
-    ['20234651182', '李四', '计算机科学与技术1班', 1, 10]
+    ['202322511772', '张三零', '23级1班', 0, 1],
+    ['202346511822', '李四飒', '23级1班', 1, 1],
   ]
   const ws = XLSX.utils.aoa_to_sheet(wsData)
-  
+
   // 设置列宽
   ws['!cols'] = [
     { wch: 15 }, // student_id
     { wch: 12 }, // student_name
     { wch: 20 }, // class_
-    { wch: 8 },  // status
-    { wch: 10 }  // course_id
+    { wch: 8 }, // status
+    { wch: 10 }, // course_id
   ]
-  
+
   XLSX.utils.book_append_sheet(wb, ws, '学生信息')
   XLSX.writeFile(wb, '学生导入模板.xlsx')
 }
@@ -890,7 +1012,7 @@ const editStudent = (student: any) => {
     student_id: student.student_id,
     student_name: student.student_name,
     class_: student.class_,
-    student_password: ''
+    student_password: '',
   }
   editStudentVisible.value = true
 }
@@ -905,7 +1027,7 @@ const updateStudent = async () => {
     updatingStudent.value = true
     const updateData: any = {
       student_name: editStudentForm.value.student_name,
-      class_: editStudentForm.value.class_
+      class_: editStudentForm.value.class_,
     }
 
     // 只有在输入了新密码时才包含密码字段
@@ -913,7 +1035,10 @@ const updateStudent = async () => {
       updateData.student_password = editStudentForm.value.student_password
     }
 
-    const response = await axios.put(`/teacher/students/${editStudentForm.value.student_id}`, updateData)
+    const response = await axios.put(
+      `/teacher/students/${editStudentForm.value.student_id}`,
+      updateData,
+    )
     if (response.data) {
       ElMessage.success('更新学生信息成功')
       editStudentVisible.value = false
@@ -939,8 +1064,8 @@ const deleteStudent = async (student: any) => {
         confirmButtonText: '确定删除',
         cancelButtonText: '取消',
         type: 'warning',
-        dangerouslyUseHTMLString: false
-      }
+        dangerouslyUseHTMLString: false,
+      },
     )
 
     // 调用adminService删除学生
@@ -1021,7 +1146,7 @@ const changePassword = async () => {
 
     const response = await axios.put('/teacher/change-password', {
       old_password: passwordForm.value.oldPassword,
-      new_password: passwordForm.value.newPassword
+      new_password: passwordForm.value.newPassword,
     })
 
     if (response.data && response.data.code === 200) {
@@ -1030,7 +1155,7 @@ const changePassword = async () => {
       passwordForm.value = {
         oldPassword: '',
         newPassword: '',
-        confirmPassword: ''
+        confirmPassword: '',
       }
     } else {
       ElMessage.error(response.data?.msg || '密码修改失败')

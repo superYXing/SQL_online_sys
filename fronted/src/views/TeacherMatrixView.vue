@@ -59,7 +59,7 @@
         </div>
 
         <!-- 矩阵表格 -->
-        <div class="matrix-container" v-loading="loading">
+        <div class="matrix-container" v-if="(filteredStudents.length > 0 && problemList.length > 0) || loading" v-loading="loading">
           <el-table 
             :data="filteredStudents" 
             border 
@@ -113,6 +113,25 @@
               </template>
             </el-table-column>
           </el-table>
+        </div>
+
+        <!-- 无数据状态 -->
+        <div v-else class="empty-state-container">
+          <EmptyState 
+            v-if="filteredStudents.length === 0 && problemList.length === 0"
+            title="暂无学生和题目数据" 
+            description="当前没有学生信息和题目数据，请检查数据源或联系管理员。"
+          />
+          <EmptyState 
+            v-else-if="filteredStudents.length === 0"
+            title="暂无学生数据" 
+            description="当前没有学生信息，请检查班级筛选条件或联系管理员。"
+          />
+          <EmptyState 
+            v-else-if="problemList.length === 0"
+            title="暂无题目数据" 
+            description="当前没有题目信息，请联系管理员添加题目。"
+          />
         </div>
 
         <!-- 学生详情悬浮卡片 -->
@@ -263,6 +282,7 @@ import {
   type FormRules
 } from 'element-plus'
 import { ArrowLeft, ArrowDown, Refresh } from '@element-plus/icons-vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 // 类型定义
 interface Student {
@@ -428,14 +448,8 @@ const fetchProblems = async () => {
     }
   } catch (error) {
     console.error('获取题目列表失败:', error)
-    // 使用模拟数据
-    problemList.value = [
-      { problem_id: 1, is_required: 1, is_ordered: 0, problem_content: '基础查询题目', example_sql: 'SELECT * FROM table' },
-      { problem_id: 2, is_required: 1, is_ordered: 0, problem_content: '连接查询题目', example_sql: 'SELECT * FROM table1 JOIN table2' },
-      { problem_id: 3, is_required: 0, is_ordered: 1, problem_content: '子查询题目', example_sql: 'SELECT * FROM (SELECT * FROM table)' },
-      { problem_id: 4, is_required: 1, is_ordered: 0, problem_content: '聚合函数题目', example_sql: 'SELECT COUNT(*) FROM table' },
-      { problem_id: 5, is_required: 0, is_ordered: 0, problem_content: '窗口函数题目', example_sql: 'SELECT ROW_NUMBER() OVER()' }
-    ]
+    ElMessage.error('获取题目列表失败，请检查网络连接')
+    problemList.value = []
   }
 }
 
@@ -539,16 +553,7 @@ const fetchStudentProfile = async (studentId: string) => {
     }
   } catch (error) {
     console.error('获取学生详情失败:', error)
-    // 返回模拟数据
-    return {
-      student_id: studentId,
-      student_name: '张三',
-      class_name: '计算机科学与技术1班',
-      course_id: 1,
-      status: 1,
-      correct_count: Math.floor(Math.random() * 10),
-      submit_count: Math.floor(Math.random() * 20) + 10
-    }
+    return null
   }
 }
 
@@ -597,12 +602,7 @@ const fetchProblemSummary = async (problemId: number) => {
     }
   } catch (error) {
     console.error('获取题目统计信息失败:', error)
-    // 返回模拟数据
-    return {
-      problem_id: problemId,
-      completed_student_count: Math.floor(Math.random() * 50) + 10,
-      total_submission_count: Math.floor(Math.random() * 200) + 50
-    }
+    return null
   }
 }
 
@@ -1068,6 +1068,15 @@ onMounted(() => {
   color: #6b7280;
   font-size: 13px;
   font-weight: 500;
+}
+
+/* 空状态容器 */
+.empty-state-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 180px);
 }
 
 /* 对话框样式 */

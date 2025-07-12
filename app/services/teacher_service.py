@@ -26,9 +26,43 @@ from services.public_service import public_service
 class TeacherService:
     """教师服务类"""
 
+    def _extract_schema_definition(self, sql_content: str) -> str:
+        """
+        从SQL内容中提取建表语句部分（截取到INSERT关键词之前）
+
+        Args:
+            sql_content: 完整的SQL内容
+
+        Returns:
+            只包含建表语句的SQL内容
+        """
+        if not sql_content:
+            return sql_content
+
+        # 将SQL内容按行分割
+        lines = sql_content.split('\n')
+        result_lines = []
+
+        for line in lines:
+            # 检查当前行是否是INSERT语句（不区分大小写）
+            line_stripped = line.strip()
+            line_upper = line_stripped.upper()
+
+            # 跳过空行和注释行
+            if not line_stripped or line_stripped.startswith('--') or line_stripped.startswith('/*'):
+                result_lines.append(line)
+                continue
+
+            # 检查是否是INSERT语句（必须以INSERT开头，不是在注释中）
+            if line_upper.startswith('INSERT'):
+                # 遇到INSERT语句，停止添加后续内容
+                break
+
+            result_lines.append(line)
+
+        return '\n'.join(result_lines).strip()
 
 
-    
     def get_teacher_profile(self, teacher_id: str, db: Session) -> Optional[TeacherProfileResponse]:
         """获取教师个人信息"""
         try:
@@ -187,18 +221,27 @@ class TeacherService:
 
                 except Exception as e:
                     fail_count += 1
-                    fail_details.append(f"学生 {course_data.student_id}: {str(e)}")
+                    fail_details.append(f"学生{course_data.student_name} {course_data.student_id}: {str(e)}")
 
             # 提交事务
             if success_count > 0:
                 db.commit()
 
-            if fail_count > 0:
+            # 根据成功和失败情况返回不同的响应
+            if success_count == 0:
+                # 全部失败
+                message = f"批量添加失败，共 {fail_count} 条失败。失败详情: {'; '.join(fail_details)}"
+                response = StudentCourseAddResponse(code=400, msg="批量添加失败")
+                return False, message, response
+            elif fail_count > 0:
+                # 部分成功
                 message = f"批量添加完成，成功 {success_count} 条，失败 {fail_count} 条。失败详情: {'; '.join(fail_details)}"
+                response = StudentCourseAddResponse(code=206, msg=f"部分成功，成功 {success_count} 条，失败 {fail_count} 条。失败详情: {'; '.join(fail_details)}")
             else:
+                # 全部成功
                 message = f"批量添加成功，共添加 {success_count} 条学生选课信息"
-
-            response = StudentCourseAddResponse(code=200, msg="添加成功")
+                response = StudentCourseAddResponse(code=200, msg="批量添加成功")
+            
             return True, message, response
 
         except Exception as e:
@@ -980,7 +1023,8 @@ class TeacherService:
                     port=port,
                     database=database,
                     user=user,
-                    password=password
+                    password=password,
+                    options=f"-c client_encoding=UTF8"  # 显式设置客户端编码为 UTF-8
                 )
 
                 with conn.cursor() as cur:
@@ -1024,20 +1068,22 @@ class TeacherService:
             else:
                 error_messages.append(f"OpenGauss错误: {opengauss_error_msg}")
 
-            # 如果所有引擎都失败，返回错误
-            if success_count == 0:
-                return False, f"所有数据库引擎执行都失败: {'; '.join(error_messages)}", None
-            elif success_count < 3:
-                print(f"部分数据库引擎执行失败: {'; '.join(error_messages)}")
-                # 继续执行，只要有一个成功就算成功
+            # 必须三种数据库都成功才返回正确
+            if success_count < 3:
+                return False, f"数据库引擎执行失败，必须三种数据库都创建成功: {'; '.join(error_messages)}", None
 
             # 4. 执行成功后将数据插入到database_schema表中
+            # 截取PostgreSQL建表语句到INSERT关键词之前的内容
+            schema_definition_only = self._extract_schema_definition(
+                schema_data.sql_file_content.postgresql_opengauss_engine
+            )
+
             new_schema = DatabaseSchema(
                 schema_name=schema_data.schema_name,
                 schema_discription=schema_data.schema_description,  # 使用模式描述
                 sql_schema=schema_data.sql_schema,  # 保存SQL模式名称
                 schema_author=schema_data.schema_author,  # 使用请求中的作者
-                sql_table=schema_data.sql_file_content.postgresql_opengauss_engine  # 保存PostgreSQL建表语句
+                sql_table=schema_definition_only  # 只保存建表语句部分，不包含INSERT语句
             )
 
             db.add(new_schema)
