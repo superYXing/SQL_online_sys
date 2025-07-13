@@ -404,7 +404,8 @@ class StudentService:
                 schema_list.append(DatabaseSchemaItem(
                     schema_id=schema.schema_id,
                     schema_name=schema.schema_name,
-                    schema_description=schema.schema_discription  # 注意原字段名的拼写
+                    schema_description=schema.schema_discription,  # 注意原字段名的拼写
+                    schema_author=schema.schema_author
                 ))
 
             return DatabaseSchemaListResponse(
@@ -414,6 +415,31 @@ class StudentService:
 
         except Exception as e:
             print(f"获取数据库模式列表失败: {e}")
+            return DatabaseSchemaListResponse(schemas=[], total=0)
+
+    def get_active_database_schemas(self, db: Session) -> DatabaseSchemaListResponse:
+        """获取启用状态的数据库模式列表（学生版）"""
+        try:
+            # 只查询状态为1（启用）的数据库模式
+            schemas = db.query(DatabaseSchema).filter(DatabaseSchema.schema_status == 1).all()
+
+            # 构建响应数据
+            schema_list = []
+            for schema in schemas:
+                schema_list.append(DatabaseSchemaItem(
+                    schema_id=schema.schema_id,
+                    schema_name=schema.schema_name,
+                    schema_description=schema.schema_discription,  # 注意原字段名的拼写
+                    schema_author=schema.schema_author
+                ))
+
+            return DatabaseSchemaListResponse(
+                schemas=schema_list,
+                total=len(schema_list)
+            )
+
+        except Exception as e:
+            print(f"获取启用状态数据库模式列表失败: {e}")
             return DatabaseSchemaListResponse(schemas=[], total=0)
 
     def get_student_answer_records(self, student_id: str, problem_id: int, db: Session) -> Optional[StudentAnswerRecordsResponse]:

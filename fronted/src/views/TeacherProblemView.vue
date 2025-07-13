@@ -142,9 +142,16 @@
                 <div class="info-card">
                   <div class="card-title">知识点</div>
                   <div class="knowledge-points">
-                    <div class="placeholder-box"></div>
-                    <div class="placeholder-box"></div>
-                    <div class="placeholder-box"></div>
+                    <el-tag 
+                      v-for="(point, index) in knowledgePoints" 
+                      :key="index" 
+                      type="info" 
+                      size="small"
+                      class="knowledge-tag"
+                    >
+                      {{ point }}
+                    </el-tag>
+                    <span v-if="knowledgePoints.length === 0" class="no-knowledge">暂无知识点</span>
                   </div>
                 </div>
               </div>
@@ -223,6 +230,14 @@
             placeholder="请输入示例SQL（可选）"
           />
         </el-form-item>
+        <el-form-item label="知识点" prop="knowledge">
+          <el-input
+            v-model="editForm.knowledge"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入知识点，多个知识点用中文顿号（、）或逗号（,）分隔"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -297,7 +312,8 @@ const editForm = ref({
   is_required: 1,
   is_ordered: 0,
   problem_content: '',
-  example_sql: ''
+  example_sql: '',
+  knowledge: ''
 })
 
 const passwordForm = ref({
@@ -309,6 +325,19 @@ const passwordForm = ref({
 // 表单引用
 const editFormRef = ref()
 const passwordFormRef = ref()
+
+// 计算属性
+const knowledgePoints = computed(() => {
+  if (!selectedProblem.value || !selectedProblem.value.knowledge) {
+    return []
+  }
+  
+  // 使用中文顿号、逗号或分号分割知识点
+  return selectedProblem.value.knowledge
+    .split(/[、,，;；]/)
+    .map((point: string) => point.trim())
+    .filter((point: string) => point.length > 0)
+})
 
 // 表单验证规则
 const editRules = {
@@ -464,21 +493,10 @@ const selectProblem = async (problem: any) => {
   await fetchProblemStats(problem.problem_id)
 }
 
-// 从teacher接口获取题目详细内容
+// 从teacher接口获取题目详细内容（包含knowledge字段）
 const fetchProblemDetailFromTeacher = async (problemId: number) => {
   try {
-    // 如果teacher接口支持schema_name参数，使用schema_name
-    // 否则仍使用schema_id（需要根据实际API接口确定）
-    const params: any = {}
-    if (selectedSchemaInfo.value?.schema_name) {
-      params.schema_name = selectedSchemaInfo.value.schema_name
-    } else if (selectedSchemaInfo.value?.schema_id) {
-      params.schema_id = selectedSchemaInfo.value.schema_id
-    }
-    
-    const response = await axios.get('/teacher/problem/list', {
-      params: params
-    })
+    const response = await axios.get('/teacher/problem/list')
     
     if (response.data && response.data.code === 200 && response.data.data) {
       const problemDetail = response.data.data.find((p: any) => p.problem_id === problemId)
@@ -545,7 +563,8 @@ const showCreateDialog = () => {
     is_required: 1,
     is_ordered: 0,
     problem_content: '',
-    example_sql: ''
+    example_sql: '',
+    knowledge: ''
   }
   editDialogVisible.value = true
 }
@@ -558,7 +577,8 @@ const editProblem = (problem: any) => {
     is_required: problem.is_required !== undefined ? problem.is_required : 1,
     is_ordered: problem.is_ordered !== undefined ? problem.is_ordered : 0,
     problem_content: problem.problem_content || '',
-    example_sql: problem.example_sql || ''
+    example_sql: problem.example_sql || '',
+    knowledge: problem.knowledge || ''
   }
   editDialogVisible.value = true
 }
@@ -632,7 +652,8 @@ const submitEdit = async () => {
         is_required: editForm.value.is_required,
         is_ordered: editForm.value.is_ordered,
         problem_content: editForm.value.problem_content,
-        example_sql: editForm.value.example_sql
+        example_sql: editForm.value.example_sql,
+        knowledge: editForm.value.knowledge
       }
       
       // 如果有选中的模式，添加schema_id
@@ -1241,8 +1262,19 @@ const handleLogout = () => {
 
 .knowledge-points {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.knowledge-tag {
+  margin: 2px 0;
+}
+
+.no-knowledge {
+  color: #909399;
+  font-size: 12px;
+  font-style: italic;
 }
 
 .placeholder-box {

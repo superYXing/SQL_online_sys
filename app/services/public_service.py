@@ -6,6 +6,7 @@ from schemas.public import (
     CurrentSemesterResponse, SemesterInfo, SemesterListResponse,
     SystemInfoResponse, DatabaseSchemaPublicInfo, DatabaseSchemaPublicListResponse,
     ProblemPublicInfo, ProblemPublicListResponse, DatabaseSchemaListItem, DatabaseSchemaListResponse,
+    DatabaseSchemaWithStatusListResponse, DatabaseSchemaWithStatusItem,
     SchemaProblemsGroup
 )
 from datetime import datetime, date
@@ -164,6 +165,28 @@ class PublicService:
         except Exception as e:
             print(f"获取数据库模式列表失败: {e}")
             return DatabaseSchemaListResponse(root=[])
+
+    def get_database_schema_list_with_status(self, db: Session) -> DatabaseSchemaWithStatusListResponse:
+        """获取包含状态的数据库模式列表"""
+        try:
+            schemas = db.query(DatabaseSchema).all()
+
+            # 构建响应数据
+            schema_list = []
+            for schema in schemas:
+                schema_list.append(DatabaseSchemaWithStatusItem(
+                    schema_id=schema.schema_id,
+                    schema_name=schema.schema_name or "",
+                    schema_description=schema.schema_discription or "",
+                    schema_author=schema.schema_author or "",
+                    schema_status=schema.schema_status if hasattr(schema, 'schema_status') and schema.schema_status is not None else 0
+                ))
+
+            return DatabaseSchemaWithStatusListResponse(root=schema_list)
+
+        except Exception as e:
+            print(f"获取包含状态的数据库模式列表失败: {e}")
+            return DatabaseSchemaWithStatusListResponse(root=[])
 
     def check_semester_exists(self, semester_id: int, db: Session) -> bool:
         """检查学期是否存在"""

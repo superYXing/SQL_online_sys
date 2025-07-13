@@ -4,7 +4,8 @@ from typing import Optional
 from models.base import get_db
 from schemas.public import (
     CurrentSemesterResponse, SemesterListResponse, SystemInfoResponse,
-    DatabaseSchemaPublicListResponse, ProblemPublicListResponse, DatabaseSchemaListResponse
+    DatabaseSchemaPublicListResponse, ProblemPublicListResponse, DatabaseSchemaListResponse,
+    DatabaseSchemaWithStatusListResponse
 )
 from services.public_service import public_service
 from services.auth_dependency import get_current_user
@@ -121,26 +122,28 @@ async def get_database_schemas(
             detail=f"获取数据库模式列表失败: {str(e)}"
         )
 
-@public_router.get("/schema/list", response_model=DatabaseSchemaListResponse, summary="获取所有数据库模式")
+@public_router.get("/schema/list", response_model=DatabaseSchemaWithStatusListResponse, summary="获取所有数据库模式")
 async def get_all_database_schemas(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    获取所有数据库模式列表（新格式）
+    获取所有数据库模式列表（包含状态）
 
     需要登录认证（所有角色可访问）
 
     返回：
     - 数据库模式数组，每个元素包含：
+      - schema_id: 模式ID
       - schema_name: 模式名称
       - schema_description: 模式描述（HTML格式）
       - schema_author: 模式作者
+      - schema_status: 模式状态（0=禁用，1=启用）
 
-    注意：此接口替代了 /admin/schemas 接口，现在所有登录用户都可以访问
+    注意：此接口替代了原有的 /schema/list 接口，现在包含状态字段
     """
     try:
-        schemas = public_service.get_database_schema_list(db=db)
+        schemas = public_service.get_database_schema_list_with_status(db=db)
         return schemas
 
     except Exception as e:

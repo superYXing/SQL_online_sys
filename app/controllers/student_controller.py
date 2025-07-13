@@ -8,7 +8,7 @@ import schemas.student
 from schemas.student import (
     StudentProfileResponse, StudentRankItem, AnswerSubmitRequest,
     AnswerSubmitResponse, AnswerRecordsResponse, ProblemListResponse,
-    DatabaseSchemaListResponse, AIAnalyzeRequest, AIAnalyzeResponse,
+    DatabaseSchemaListResponse, DatabaseSchemaItem, AIAnalyzeRequest, AIAnalyzeResponse,
     StudentAnswerRecordsResponse
 )
 from schemas.response import BaseResponse
@@ -247,8 +247,36 @@ async def get_student_answer_records(
 # 题目列表接口已移至 /public 路径
 # 请使用 GET /public/problem/list 替代此接口
 
-# 数据库模式列表接口已移至 /public 路径
-# 请使用 GET /public/schemas 替代此接口
+@student_router.get("/schema/list", response_model=List[DatabaseSchemaItem], summary="获取所有数据库模式（学生版）")
+async def get_database_schemas_for_student(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取所有数据库模式（学生版）
+    
+    需要登录认证（所有角色都可访问）
+    
+    根据database_schema.status来获得数据库模式，0则不获得，1为获得
+    
+    返回启用状态的数据库模式列表：
+    - schema_id: 模式ID
+    - schema_name: 模式名称
+    - schema_description: 模式描述
+    - schema_author: 模式作者
+    """
+    try:
+        # 获取启用状态的数据库模式列表
+        schemas_response = student_service.get_active_database_schemas(db=db)
+        
+        # 直接返回schemas数组，符合用户要求的响应格式
+        return schemas_response.schemas
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取数据库模式列表失败: {str(e)}"
+        )
 
 @student_router.post("/answer/ai-analyze", summary="AI分析SQL语句（流式输出）")
 async def ai_analyze_sql(

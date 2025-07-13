@@ -140,3 +140,48 @@ class DatabaseSchemaListResponse(RootModel):
                 }
             ]
         }
+
+class DatabaseSchemaWithStatusItem(BaseModel):
+    """包含状态的数据库模式项模型"""
+    schema_id: int
+    schema_name: str
+    schema_description: str
+    schema_author: str
+    schema_status: int
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "schema_id": 1,
+                "schema_name": "ORACLE_HR",
+                "schema_description": "html_description",
+                "schema_author": "name",
+                "schema_status": 1
+            }
+        }
+
+class DatabaseSchemaWithStatusListResponse(RootModel):
+    """包含状态的数据库模式列表响应模型"""
+    root: List[DatabaseSchemaWithStatusItem]
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": [
+                {
+                    "schema_id": 1,
+                    "schema_name": "ORACLE_HR",
+                    "schema_description": "html_description",
+                    "schema_author": "name",
+                    "schema_status": 0
+                },
+                {
+                    "schema_id": 2,
+                    "schema_name": "ORACLE_SH",
+                    "schema_description": "html_description",
+                    "schema_author": "name",
+                    "schema_status": 1
+                }
+            ]
+        }

@@ -64,11 +64,8 @@
                   <div class="schema-author">{{ schema.schema_author }}</div>
                   <!-- 数据库模式状态信息 -->
                   <div class="schema-visibility">
-                    <el-tag
-                      :type="getVisibilityTagType(schema.visibility || 'fully_visible')"
-                      size="small"
-                    >
-                      {{ getVisibilityText(schema.visibility || 'fully_visible') }}
+                    <el-tag :type="getVisibilityTagType(schema.schema_status || 0)" size="small">
+                      {{ getVisibilityText(schema.schema_status || 0) }}
                     </el-tag>
                   </div>
                 </div>
@@ -91,38 +88,26 @@
               <h4>📋 数据库模式状态说明</h4>
               <div class="visibility-options">
                 <div class="visibility-option">
-                  <el-radio v-model="defaultVisibility" label="fully_visible" disabled>
-                    完全可见
-                  </el-radio>
+                  <el-radio v-model="schemaStatus" :label="1"> 完全可见 </el-radio>
                   <p class="option-desc">
                     学生可以使用数据库模式的题目，也可以使用数据库模式的查询功能。
                   </p>
                 </div>
                 <div class="visibility-option">
-                  <el-radio v-model="defaultVisibility" label="problem_only" disabled>
-                    仅题目可见
-                  </el-radio>
-                  <p class="option-desc">学生仅可以使用数据库模式的题目。</p>
-                </div>
-                <div class="visibility-option">
-                  <el-radio v-model="defaultVisibility" label="query_only" disabled>
-                    仅查询可用
-                  </el-radio>
-                  <p class="option-desc">学生仅可以使用数据库模式的查询功能。</p>
-                </div>
-                <div class="visibility-option">
-                  <el-radio v-model="defaultVisibility" label="invisible" disabled>
-                    不可见
-                  </el-radio>
+                  <el-radio v-model="schemaStatus" :label="0"> 不可见 </el-radio>
                   <p class="option-desc">数据库模式对学生透明。</p>
                 </div>
               </div>
-            </div>
-
-            <!-- 连接信息说明 -->
-            <div class="connection-info-note">
-              <h4>🔗 数据库模式连接信息</h4>
-              <p class="info-note">仅作者可见</p>
+              <div class="status-actions">
+                <el-button
+                  type="primary"
+                  @click="updateSchemaStatus"
+                  :loading="statusLoading"
+                  class="confirm-btn"
+                >
+                  确认设置
+                </el-button>
+              </div>
             </div>
           </div>
 
@@ -374,38 +359,16 @@
                   <h4>📋 数据库模式状态说明</h4>
                   <div class="visibility-options">
                     <div class="visibility-option">
-                      <el-radio v-model="defaultVisibility" label="fully_visible" disabled>
-                        完全可见
-                      </el-radio>
+                      <el-tag type="success" size="small">完全可见</el-tag>
                       <p class="option-desc">
                         学生可以使用数据库模式的题目，也可以使用数据库模式的查询功能。
                       </p>
                     </div>
                     <div class="visibility-option">
-                      <el-radio v-model="defaultVisibility" label="problem_only" disabled>
-                        仅题目可见
-                      </el-radio>
-                      <p class="option-desc">学生仅可以使用数据库模式的题目。</p>
-                    </div>
-                    <div class="visibility-option">
-                      <el-radio v-model="defaultVisibility" label="query_only" disabled>
-                        仅查询可用
-                      </el-radio>
-                      <p class="option-desc">学生仅可以使用数据库模式的查询功能。</p>
-                    </div>
-                    <div class="visibility-option">
-                      <el-radio v-model="defaultVisibility" label="invisible" disabled>
-                        不可见
-                      </el-radio>
+                      <el-tag type="danger" size="small">不可见</el-tag>
                       <p class="option-desc">数据库模式对学生透明。</p>
                     </div>
                   </div>
-                </div>
-
-                <!-- 数据库模式连接信息 -->
-                <div class="connection-info-note">
-                  <h4>🔗 数据库模式连接信息</h4>
-                  <p class="info-note">仅作者可见</p>
                 </div>
               </div>
             </div>
@@ -414,7 +377,7 @@
             <div v-if="activeTab === 'query'" class="content-panel">
               <div class="panel-header">
                 <h3>
-                  <el-icon><Search /></el-icon> SQL操作（可查询表格，也可更新表格）
+                  <el-icon><Search /></el-icon> SQL操作（全部权限）（pgsql引擎）
                 </h3>
                 <div class="query-actions">
                   <el-button type="primary" @click="executeQuery" :loading="queryLoading">
@@ -730,7 +693,9 @@ const sqlQuery = ref('SELECT * FROM EMPLOYEES')
 const queryResults = ref<any[]>([])
 const queryColumns = ref<string[]>([])
 const queryHistory = ref<any[]>([])
-const defaultVisibility = ref('fully_visible')
+
+const schemaStatus = ref<number>(1) // 1: 完全可见, 0: 不可见
+const statusLoading = ref(false)
 
 // 编辑模式相关
 const isEditMode = ref(false)
@@ -857,6 +822,9 @@ const selectSchema = (schema: any) => {
   // 清空查询结果
   queryResults.value = []
   queryColumns.value = []
+  // 根据当前模式的状态初始化schemaStatus
+  // 使用后端返回的schema_status字段（0为不可见，1为可见）
+  schemaStatus.value = schema.schema_status || 0
 }
 
 // 获取选中模式的schema_id
@@ -1038,6 +1006,36 @@ const goBack = () => {
   router.go(-1)
 }
 
+// 更新数据库模式状态
+const updateSchemaStatus = async () => {
+  if (!selectedSchemaInfo.value) {
+    ElMessage.warning('请先选择数据库模式')
+    return
+  }
+
+  try {
+    statusLoading.value = true
+
+    const response = await axios.put('/teacher/schema-status', {
+      schema_id: selectedSchemaInfo.value.schema_id,
+      status: schemaStatus.value,
+    })
+
+    if (response.data && response.data.code === 200) {
+      ElMessage.success(response.data.message || '权限设置成功')
+      // 重新获取模式列表以更新状态显示
+      await fetchSchemaList()
+    } else {
+      ElMessage.error(response.data?.message || '权限设置失败')
+    }
+  } catch (error) {
+    console.error('设置数据库模式权限失败:', error)
+    ElMessage.error('设置数据库模式权限失败')
+  } finally {
+    statusLoading.value = false
+  }
+}
+
 // 显示创建数据库模式对话框
 const showCreateDialog = () => {
   createDialogVisible.value = true
@@ -1188,36 +1186,16 @@ const createSchema = async () => {
 }
 
 // 获取可见性标签类型
-const getVisibilityTagType = (visibility: string) => {
-  switch (visibility) {
-    case 'fully_visible':
-      return 'success'
-    case 'problem_only':
-      return 'warning'
-    case 'query_only':
-      return 'info'
-    case 'invisible':
-      return 'danger'
-    default:
-      return 'success'
-  }
+const getVisibilityTagType = (status: number) => {
+  return status === 1 ? 'success' : 'danger'
 }
 
 // 获取可见性文本
-const getVisibilityText = (visibility: string) => {
-  switch (visibility) {
-    case 'fully_visible':
-      return '完全可见'
-    case 'problem_only':
-      return '仅题目可见'
-    case 'query_only':
-      return '仅查询可用'
-    case 'invisible':
-      return '不可见'
-    default:
-      return '完全可见'
-  }
+const getVisibilityText = (status: number) => {
+  return status === 1 ? '完全可见' : '不可见'
 }
+
+// 获取数据库类型标签颜色
 
 // 进入编辑模式
 const enterEditMode = () => {
@@ -1644,26 +1622,6 @@ const deleteSchema = async (schema: any) => {
   font-size: 12px;
   color: #606266;
   line-height: 1.4;
-}
-
-/* 连接信息说明 */
-.connection-info-note {
-  padding: 16px;
-  border-top: 1px solid #e4e7ed;
-  background-color: #f0f9ff;
-}
-
-.connection-info-note h4 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  color: #303133;
-}
-
-.info-note {
-  margin: 0;
-  font-size: 12px;
-  color: #606266;
-  font-style: italic;
 }
 
 /* 中间面板 - 选项按钮 */

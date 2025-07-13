@@ -13,6 +13,7 @@ from schemas.teacher import (
     ScoreCalculateRequest, ScoreUpdateResponse, ScoreListResponse,
     TeacherProblemListResponse, TeacherSchemaListResponse, TeacherProblemListDocResponse, TeacherProblemItem,
     StudentScoreListResponse, StudentScoreItem, SchemaUpdateRequest, SchemaUpdateResponse,
+    SchemaStatusUpdateRequest, SchemaStatusUpdateResponse,
     SQLQueryRequest, SQLQueryResponse, SemesterListResponse,
     StudentProblemStatsRequest, StudentProblemStatsResponse,
     StudentAnswerRecordsRequest, StudentAnswerRecordsResponse,
@@ -23,7 +24,8 @@ from schemas.teacher import (
     StudentProfileDocResponse, StudentDetailResponse,
     ProblemDeleteResponse, StudentCourseAddRequest, StudentCourseAddResponse,
     SchemaCreateRequest, SchemaCreateResponse, SQLQueryRequest, SQLQueryResponse,
-    ProblemCreateRequest, ProblemCreateResponse, StudentDetailInfo, StudentUpdateRequest, StudentUpdateResponse
+    ProblemCreateRequest, ProblemCreateResponse, StudentDetailInfo, StudentUpdateRequest, StudentUpdateResponse,
+    DatabaseLinkInfoResponse, ProblemKnowledgeAnalysisRequest, ProblemKnowledgeAnalysisResponse
 )
 from schemas.admin import StudentInfo, StudentListResponse, OperationResponse
 from schemas.response import BaseResponse
@@ -1032,7 +1034,8 @@ async def get_problem_detail(
                     is_required=0,
                     is_ordered=0,
                     problem_content="",
-                    example_sql=""
+                    example_sql="",
+                    knowledge=None
                 )
             )
 
@@ -1042,7 +1045,8 @@ async def get_problem_detail(
             is_required=problem.is_required or 0,
             is_ordered=problem.is_ordered or 0,  # 注意数据库字段名的拼写
             problem_content=problem.problem_content or "",
-            example_sql=problem.example_sql or ""
+            example_sql=problem.example_sql or "",
+            knowledge=problem.knowledge or None
         )
 
         return ProblemDetailResponse(
@@ -1060,7 +1064,8 @@ async def get_problem_detail(
                 is_required=0,
                 is_ordered=0,
                 problem_content="",
-                example_sql=""
+                example_sql="",
+                knowledge=None
             )
         )
 
@@ -1082,6 +1087,7 @@ async def edit_problem(
     - is_ordered: 是否有序（可选）
     - problem_content: 题目内容（可选）
     - example_sql: 示例SQL（可选）
+    - knowledge: 知识点信息（可选）
 
     返回：
     - code: 状态码
@@ -1107,6 +1113,8 @@ async def edit_problem(
             problem.problem_content = edit_request.problem_content
         if edit_request.example_sql is not None:
             problem.example_sql = edit_request.example_sql
+        if edit_request.knowledge is not None:
+            problem.knowledge = edit_request.knowledge
 
         # 提交更改
         db.commit()
@@ -1318,4 +1326,136 @@ async def delete_database_schema(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"删除数据库模式失败: {str(e)}"
+        )
+
+@teacher_router.put("/schema-status", response_model=SchemaStatusUpdateResponse, summary="设置数据库模式的权限")
+async def update_schema_status(
+    request_data: SchemaStatusUpdateRequest,
+    current_user: dict = Depends(get_current_teacher),
+    db: Session = Depends(get_db)
+):
+    """
+    设置数据库模式的权限
+
+    需要教师身份的JWT认证令牌
+
+    请求参数：
+    - schema_id: 数据库模式ID
+    - status: 状态（0为禁用，1为启用）
+
+    返回：
+    - code: 状态码（200表示成功）
+    - message: 消息（"权限设置成功"）
+    """
+    try:
+        success, message, response = teacher_service.update_schema_status(
+            teacher_id=current_user["id"],
+            request_data=request_data,
+            db=db
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=message
+            )
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"设置数据库模式权限失败: {str(e)}"
+        )
+
+@teacher_router.get("/schema/link-info", response_model=DatabaseLinkInfoResponse, summary="获取数据库模式的连接信息")
+async def get_database_link_info(
+    current_user: dict = Depends(get_current_teacher),
+    db: Session = Depends(get_db)
+):
+    """
+    获取数据库模式的连接信息
+
+    需要教师身份的JWT认证令牌
+
+    返回：
+    - link-infos: 数据库连接信息列表，包含：
+      - name: 数据库名称（MySQL、PostgreSQL、openGauss）
+      - type: 数据库类型（mysql、postgresql、opengauss）
+      - host: 主机地址
+      - port: 端口号
+      - username: 用户名
+      - database: 数据库名
+    """
+    try:
+        result = teacher_service.get_database_link_info(
+            teacher_id=current_user["id"],
+            db=db
+        )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取数据库连接信息失败: {str(e)}"
+        )
+
+@teacher_router.post("/problem/ai-analyze", response_model=ProblemKnowledgeAnalysisResponse, summary="AI分析知识点掌握度")
+async def ai_analyze_problem_knowledge(
+    request_data: ProblemKnowledgeAnalysisRequest,
+    current_user: dict = Depends(get_current_teacher),
+    db: Session = Depends(get_db)
+):
+    """
+    根据题目信息和完成度信息进行智能分析
+
+    需要教师身份的JWT认证令牌
+
+    请求参数：
+    - problems: 题目分析数据列表，包含：
+      - problem_id: 题目ID
+      - completed_student_count: 完成此题目的学生人数
+      - total_submission_count: 此题目的总提交次数
+
+    返回：
+    - code: 状态码（200表示成功）
+    - msg: 消息（"分析成功"）
+    - data: 分析结果
+      - ai_result: AI分析结果文本
+
+    执行流程：
+    1. 根据problem_id在problem表获取knowledge字段
+    2. 构建AI分析的prompt
+    3. 调用AI服务进行分析
+    4. 返回分析结果
+    """
+    try:
+        # 将请求数据转换为字典列表
+        problem_data = [item.dict() for item in request_data.root]
+        
+        success, message, response = await teacher_service.analyze_problem_knowledge_mastery(
+            teacher_id=current_user["id"],
+            problem_data=problem_data,
+            db=db
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=message
+            )
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI分析知识点掌握度失败: {str(e)}"
         )

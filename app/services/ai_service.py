@@ -138,7 +138,6 @@ class AIService:
         """调用AI API"""
         if not self.api_key:
             return "AI服务配置错误，请联系管理员。"
-        
         payload = {
             "model": self.model,
             "messages": [
@@ -147,11 +146,10 @@ class AIService:
                     "content": prompt
                 }
             ],
-            "max_tokens": 2048,
+            "max_tokens": 8192,
             "temperature": 0.7
         }
 
-        # 根据测试结果，QwQ-32B模型不支持 enable_thinking 参数
         # 只有特定模型才添加此参数
         if self.enable_thinking and "Qwen3" in self.model:
             payload["enable_thinking"] = self.enable_thinking

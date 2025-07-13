@@ -191,6 +191,7 @@ class DatabaseSchemaItem(BaseModel):
     schema_id: int
     schema_name: Optional[str]
     schema_description: Optional[str]
+    schema_author: Optional[str]
 
     class Config:
         from_attributes = True

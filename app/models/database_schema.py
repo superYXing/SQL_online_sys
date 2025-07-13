@@ -12,9 +12,10 @@ class DatabaseSchema(Base):
     sql_schema = Column(Text, nullable=True, comment="数据库模式名称，用于USE语句")
     schema_author = Column(Text, nullable=True, comment="创建模式的教师姓名")
     sql_table = Column(Text, nullable=True, comment="数据库建表语句")
+    schema_status = Column(Integer, nullable=False, default=1, comment="状态：0为禁用，1为启用")
 
     # 关系
     problems = relationship("Problem", back_populates="schema")
     
     def __repr__(self):
-        return f"<DatabaseSchema(id={self.schema_id})>" 
+        return f"<DatabaseSchema(id={self.schema_id})>"

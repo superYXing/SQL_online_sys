@@ -1,5 +1,6 @@
 <template>
   <div class="student-layout">
+    
     <!-- 顶部导航栏 -->
     <el-header class="header">
       <div class="header-left">
@@ -129,6 +130,23 @@
               <!-- 题目内容 -->
               <div class="problem-content">
                 <div v-html="selectedProblem.problem_content"></div>
+              </div>
+
+              <!-- 知识点 -->
+              <div class="knowledge-points-section" v-if="selectedProblem">
+                <h4>📚 知识点</h4>
+                <div class="knowledge-points">
+                  <el-tag
+                    v-for="point in knowledgePoints"
+                    :key="point"
+                    type="info"
+                    size="small"
+                    class="knowledge-tag"
+                  >
+                    {{ point }}
+                  </el-tag>
+                  <span v-if="knowledgePoints.length === 0" class="no-knowledge">暂无知识点</span>
+                </div>
               </div>
             </div>
 
@@ -301,7 +319,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from '@/utils/axios'
 import {
@@ -329,9 +347,7 @@ import {
   CollectionTag,
   Loading,
   SuccessFilled,
-  CircleCloseFilled,
   WarningFilled,
-  Close,
 } from '@element-plus/icons-vue'
 import Codemirror from 'codemirror-editor-vue3'
 import 'codemirror/mode/sql/sql.js'
@@ -378,6 +394,8 @@ const answerRecords = ref<any[]>([])
 const submitMessage = ref('')
 const submitMessageType = ref<'success' | 'error' | 'warning' | ''>('')
 
+
+
 // 密码修改相关
 const passwordDialogVisible = ref(false)
 const passwordLoading = ref(false)
@@ -393,6 +411,18 @@ const aiDialogVisible = ref(false)
 const aiAnalyzing = ref(false)
 const aiAnalysisResult = ref('')
 const currentAnalyzingRecord = ref<any>(null)
+
+// 知识点计算属性
+const knowledgePoints = computed(() => {
+  if (!selectedProblem.value || !selectedProblem.value.knowledge) {
+    return []
+  }
+  
+  return selectedProblem.value.knowledge
+    .split(/[,，;；、]/) // 支持中英文逗号、分号、顿号
+    .map((point: string) => point.trim())
+    .filter((point: string) => point.length > 0)
+})
 
 // 密码验证规则
 const validateConfirmPassword = (rule: any, value: string, callback: any) => {
@@ -434,10 +464,10 @@ const fetchStudentInfo = async () => {
   }
 }
 
-// 获取数据库模式列表
+// 获取数据库模式列表（学生版）
 const fetchSchemaList = async () => {
   try {
-    const response = await axios.get('/public/schema/list')
+    const response = await axios.get('/student/schema/list')
     if (response.data && Array.isArray(response.data)) {
       schemaList.value = response.data
     }
@@ -536,6 +566,11 @@ const submitSQL = async () => {
 
   try {
     submitting.value = true
+    
+    // 清除之前的提交消息
+    submitMessage.value = ''
+    submitMessageType.value = ''
+    
     const response = await axios.post('/student/answer/submit', {
       problem_id: selectedProblem.value.problem_id,
       answer_content: sqlCode.value,
@@ -543,16 +578,17 @@ const submitSQL = async () => {
     })
 
     if (response.data) {
-      const { resulte_type, message } = response.data
-      if (resulte_type === 0) {
+      const { result_type, message } = response.data
+      if (result_type === 0) {
         submitMessage.value = message || 'SQL提交成功，答案正确！'
         submitMessageType.value = 'success'
         ElMessage.success(message || 'SQL提交成功，答案正确！')
-      } else if (resulte_type === 1) {
+      } else if (result_type === 1) {
+        // 在编辑器下方显示语法错误
         submitMessage.value = message || 'SQL语法错误'
         submitMessageType.value = 'error'
         ElMessage.error(message || 'SQL语法错误')
-      } else if (resulte_type === 2) {
+      } else if (result_type === 2) {
         submitMessage.value = message || 'SQL结果错误'
         submitMessageType.value = 'warning'
         ElMessage.warning(message || 'SQL结果错误')
@@ -887,6 +923,8 @@ const resetPasswordForm = () => {
   overflow: hidden;
   background-color: #eef2f7; /* 浅蓝色调背景 */
 }
+
+
 
 /* 顶部导航栏 */
 .header {
@@ -1631,5 +1669,38 @@ const resetPasswordForm = () => {
     align-items: flex-start;
     gap: 10px;
   }
+}
+
+/* 知识点样式 */
+.knowledge-points-section {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.knowledge-points-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #333;
+  font-weight: 600;
+}
+
+.knowledge-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.knowledge-tag {
+  margin: 0;
+}
+
+.no-knowledge {
+  color: #999;
+  font-size: 13px;
+  font-style: italic;
 }
 </style>

@@ -195,6 +195,93 @@ class SchemaCreateResponse(BaseModel):
             }
         }
 
+class SchemaStatusUpdateRequest(BaseModel):
+    """设置数据库模式权限请求模型"""
+    schema_id: int = Field(..., description="数据库模式ID")
+    status: int = Field(..., description="状态：0为禁用，1为启用")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "schema_id": 1,
+                "status": 0
+            }
+        }
+
+class SchemaStatusUpdateResponse(BaseModel):
+    """设置数据库模式权限响应模型"""
+    code: int = 200
+    message: str = "权限设置成功"
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "code": 200,
+                "message": "权限设置成功"
+            }
+        }
+
+class DatabaseLinkInfo(BaseModel):
+    """数据库连接信息模型"""
+    name: str
+    type: str
+    host: str
+    port: int
+    username: str
+    database: str
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "name": "MySQL",
+                "type": "mysql",
+                "host": "localhost",
+                "port": 3306,
+                "username": "root",
+                "database": "sqlsys"
+            }
+        }
+
+class DatabaseLinkInfoResponse(BaseModel):
+    """数据库连接信息响应模型"""
+    link_infos: List[DatabaseLinkInfo] = Field(alias="link-infos")
+
+    class Config:
+        from_attributes = True
+        validate_by_name = True
+        json_schema_extra = {
+            "example": {
+                "link-infos": [
+                    {
+                        "name": "MySQL",
+                        "type": "mysql",
+                        "host": "localhost",
+                        "port": 3306,
+                        "username": "root",
+                        "database": "sqlsys"
+                    },
+                    {
+                        "name": "PostgreSQL",
+                        "type": "postgresql",
+                        "host": "localhost",
+                        "port": 55433,
+                        "username": "postgres",
+                        "database": "postgres"
+                    },
+                    {
+                        "name": "openGauss",
+                        "type": "opengauss",
+                        "host": "localhost",
+                        "port": 15432,
+                        "username": "gaussdb",
+                        "database": "postgres"
+                    }
+                ]
+            }
+        }
+
 class SQLQueryRequest(BaseModel):
     """SQL查询请求模型"""
     schema_id: int
@@ -293,11 +380,16 @@ class ScoreListResponse(BaseModel):
         }
 
 # 教师端题目和模式相关响应模型
+# 旧的TeacherProblemItem定义已移至下方，使用完整版本
+
 class TeacherProblemItem(BaseModel):
-    """教师端题目项模型"""
+    """教师题目项模型"""
     problem_id: int
-    is_required: int
+    is_required: int  # 是否为必做题
+    is_ordered: int   # 是否有序
     problem_content: str
+    example_sql: str
+    knowledge: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -316,12 +408,18 @@ class TeacherProblemListResponse(BaseModel):
                     {
                         "problem_id": 5,
                         "is_required": 1,
-                        "problem_content": "查询所有员工信息"
+                        "is_ordered": 0,
+                        "problem_content": "查询所有员工信息",
+                        "example_sql": "SELECT * FROM EMPLOYEES",
+                        "knowledge": "基础查询"
                     },
                     {
                         "problem_id": 6,
                         "is_required": 0,
-                        "problem_content": "查询部门平均薪资"
+                        "is_ordered": 1,
+                        "problem_content": "查询部门平均薪资",
+                        "example_sql": "SELECT AVG(SALARY) FROM EMPLOYEES GROUP BY DEPARTMENT_ID",
+                        "knowledge": "聚合函数、分组查询"
                     }
                 ]
             }
@@ -572,7 +670,7 @@ class StudentProfileData(BaseModel):
 
     class Config:
         from_attributes = True
-        populate_by_name = True
+        validate_by_name = True
 
 class StudentProfileNewResponse(BaseModel):
     """学生答题概况新响应模型"""
@@ -636,7 +734,7 @@ class StudentDetailResponse(BaseModel):
 
     class Config:
         from_attributes = True
-        populate_by_name = True
+        validate_by_name = True
         json_schema_extra = {
             "example": {
                 "id": 1,
@@ -700,7 +798,7 @@ class StudentProblemStatItem(BaseModel):
 
     class Config:
         from_attributes = True
-        populate_by_name = True
+        validate_by_name = True
 
 class StudentProblemStatisticsResponse(BaseModel):
     """学生题目统计汇总响应模型"""
@@ -814,7 +912,7 @@ class StudentScoreItem(BaseModel):
 
     class Config:
         from_attributes = True
-        populate_by_name = True  # 允许使用字段名和别名
+        validate_by_name = True  # 允许使用字段名和别名
         json_schema_extra = {
             "example": {
                 "course_id": "03",
@@ -852,16 +950,6 @@ class StudentScoreListResponse(BaseModel):
         }
 
 # 教师题目列表相关模型（按接口文档格式）
-class TeacherProblemItem(BaseModel):
-    """教师题目项模型"""
-    problem_id: int
-    is_required: int  # 是否为必做题
-    is_ordered: int   # 是否有序
-    problem_content: str
-    example_sql: str
-
-    class Config:
-        from_attributes = True
 
 class TeacherProblemListData(BaseModel):
     """教师题目列表数据模型"""
@@ -888,7 +976,8 @@ class TeacherProblemListDocResponse(BaseModel):
                         "is_required": 1,
                         "is_ordered": 0,
                         "problem_content": "查询员工信息",
-                        "example_sql": "SELECT * FROM EMPLOYEES"
+                        "example_sql": "SELECT * FROM EMPLOYEES",
+                        "knowledge": "字符串拼接、AS、JOIN ON（核心：表连接、字段拼接）"
                     }
                 ]
             }
@@ -932,6 +1021,7 @@ class ProblemDetailData(BaseModel):
     is_ordered: int
     problem_content: str
     example_sql: str
+    knowledge: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -953,7 +1043,8 @@ class ProblemDetailResponse(BaseModel):
                     "is_required": 1,
                     "is_ordered": 0,
                     "problem_content": "资的1.3倍\n3. 查询的结果包括以下字段：\n    1. 员工姓名（firstname+空格+lastname格式形成一个资",
-                    "example_sql": "FROM EMPLOYEES e3 WHERE e3.DEPARTMENT_ID =e2.DEPARTMENT_ID "
+                    "example_sql": "FROM EMPLOYEES e3 WHERE e3.DEPARTMENT_ID =e2.DEPARTMENT_ID ",
+                    "knowledge": "字符串拼接、AS、JOIN ON（核心：表连接、字段拼接）"
                 }
             }
         }
@@ -965,6 +1056,7 @@ class ProblemEditRequest(BaseModel):
     is_ordered: Optional[int] = None
     problem_content: Optional[str] = None
     example_sql: Optional[str] = None
+    knowledge: Optional[str] = None
 
     class Config:
         json_schema_extra = {
@@ -973,7 +1065,8 @@ class ProblemEditRequest(BaseModel):
                 "is_required": 1,
                 "is_ordered": 0,
                 "problem_content": "资的1.3倍\n3. 查询的结果包括以下字段：\n    1. 员工姓名（firstname+空格+lastname格式形成一个资",
-                "example_sql": "FROM EMPLOYEES e3 WHERE e3.DEPARTMENT_ID =e2.DEPARTMENT_ID "
+                "example_sql": "FROM EMPLOYEES e3 WHERE e3.DEPARTMENT_ID =e2.DEPARTMENT_ID ",
+                "knowledge": "字符串拼接、AS、JOIN ON（核心：表连接、字段拼接）"
             }
         }
 
@@ -998,6 +1091,7 @@ class ProblemCreateRequest(BaseModel):
     is_ordered: int
     problem_content: str
     example_sql: str
+    knowledge: Optional[str] = None
     schema_id: Optional[int] = None  # 可选的数据库模式ID
 
     class Config:
@@ -1007,6 +1101,7 @@ class ProblemCreateRequest(BaseModel):
                 "is_ordered": 0,
                 "problem_content": "资的1.3倍\n3. 查询的结果包括以下字段：\n    1. 员工姓名（firstname+空格+lastname格式形成一个资",
                 "example_sql": "FROM EMPLOYEES e3 WHERE e3.DEPARTMENT_ID =e2.DEPARTMENT_ID ",
+                "knowledge": "字符串拼接、AS、JOIN ON（核心：表连接、字段拼接）",
                 "schema_id": 1
             }
         }
@@ -1126,5 +1221,65 @@ class TeacherStudentListResponse(BaseModel):
                 "total": 1,
                 "page": 1,
                 "limit": 20
+            }
+        }
+
+# AI分析知识点掌握度相关模型
+class ProblemKnowledgeAnalysisItem(BaseModel):
+    """题目知识点分析项模型"""
+    problem_id: int
+    completed_student_count: int  # 完成此题目的学生人数
+    total_submission_count: int   # 此题目的总提交次数
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "problem_id": 1,
+                "completed_student_count": 21,
+                "total_submission_count": 49
+            }
+        }
+
+class ProblemKnowledgeAnalysisRequest(RootModel[List[ProblemKnowledgeAnalysisItem]]):
+    """AI分析知识点掌握度请求模型"""
+    root: List[ProblemKnowledgeAnalysisItem]
+
+    class Config:
+        json_schema_extra = {
+            "example": [
+                {
+                    "problem_id": 1,
+                    "completed_student_count": 21,
+                    "total_submission_count": 49
+                },
+                {
+                    "problem_id": 2,
+                    "completed_student_count": 121,
+                    "total_submission_count": 44
+                },
+                {
+                    "problem_id": 3,
+                    "completed_student_count": 41,
+                    "total_submission_count": 54
+                }
+            ]
+        }
+
+class ProblemKnowledgeAnalysisResponse(BaseModel):
+    """AI分析知识点掌握度响应模型"""
+    code: int = 200
+    msg: str = "分析成功"
+    data: Dict[str, str]
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "code": 200,
+                "msg": "分析成功",
+                "data": {
+                    "ai_result": "分析可得....."
+                }
             }
         }

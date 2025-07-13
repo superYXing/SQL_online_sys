@@ -54,6 +54,10 @@
             </el-button>
           </div>
           <div class="filter-right">
+            <el-button @click="openAiAnalysisDialog" type="primary" :loading="aiAnalysisLoading">
+              <el-icon><ChatDotRound /></el-icon>
+              AI助教分析
+            </el-button>
             <span class="data-info">共 {{ filteredStudents.length }} 名学生</span>
           </div>
         </div>
@@ -251,11 +255,52 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- AI助教分析对话框 -->
+    <el-dialog
+      v-model="aiAnalysisDialogVisible"
+      title="AI助教分析"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="ai-analysis-content">
+        <div v-if="aiAnalysisLoading" class="loading-container">
+           <el-icon class="is-loading"><Loading /></el-icon>
+           <p>AI正在分析学生作答情况，请稍候...</p>
+           <div class="countdown-display">
+             <span class="countdown-text">预计还需等待：</span>
+             <span class="countdown-number">{{ countdown }}</span>
+             <span class="countdown-unit">秒</span>
+           </div>
+         </div>
+        <div v-else-if="aiAnalysisResult" class="analysis-result">
+          <div class="result-header">
+            <el-icon><ChatDotRound /></el-icon>
+            <span>AI分析结果</span>
+          </div>
+          <div class="result-content">
+            <pre>{{ aiAnalysisResult }}</pre>
+          </div>
+        </div>
+        <div v-else class="no-result">
+          <el-icon><Warning /></el-icon>
+          <p>暂无分析结果</p>
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="aiAnalysisDialogVisible = false">关闭</el-button>
+          <el-button type="primary" @click="performAiAnalysis" :loading="aiAnalysisLoading">
+            重新分析
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from '@/utils/axios'
 import { 
@@ -281,7 +326,7 @@ import {
   type FormInstance,
   type FormRules
 } from 'element-plus'
-import { ArrowLeft, ArrowDown, Refresh } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowDown, Refresh, ChatDotRound, Loading, Warning } from '@element-plus/icons-vue'
 import EmptyState from '@/components/EmptyState.vue'
 
 // 类型定义
@@ -359,6 +404,13 @@ const passwordForm = ref({
   new_password: '',
   confirm_password: ''
 })
+
+// AI分析相关
+const aiAnalysisDialogVisible = ref(false)
+const aiAnalysisLoading = ref(false)
+const aiAnalysisResult = ref('')
+const countdown = ref(60)
+const countdownTimer = ref<number | null>(null)
 
 // 密码验证规则
 const passwordRules: FormRules = {
@@ -724,10 +776,98 @@ const changePassword = async () => {
   }
 }
 
+// AI分析相关函数
+const openAiAnalysisDialog = () => {
+  aiAnalysisDialogVisible.value = true
+  // 打开对话框时自动执行分析
+  performAiAnalysis()
+}
+
+// 启动倒计时
+const startCountdown = () => {
+  countdown.value = 60
+  countdownTimer.value = setInterval(() => {
+    countdown.value--
+    if (countdown.value <= 0) {
+      clearInterval(countdownTimer.value!)
+      countdownTimer.value = null
+    }
+  }, 1000)
+}
+
+// 停止倒计时
+const stopCountdown = () => {
+  if (countdownTimer.value) {
+    clearInterval(countdownTimer.value)
+    countdownTimer.value = null
+  }
+}
+
+const performAiAnalysis = async () => {
+  if (problemList.value.length === 0) {
+    ElMessage.warning('暂无题目数据，无法进行分析')
+    return
+  }
+  
+  try {
+    aiAnalysisLoading.value = true
+    aiAnalysisResult.value = ''
+    startCountdown()
+    
+    // 准备分析数据，直接使用前端已有的数据
+    const analysisData = []
+    
+    for (const problem of problemList.value) {
+      // 统计该题目的完成情况
+      const problemId = problem.problem_id.toString()
+      const problemStats_filtered = problemStats.value.filter(stat => stat.problem_id === problemId)
+      
+      // 计算完成人数（正确次数 >= 1 的学生数）
+      const completedStudentCount = problemStats_filtered.filter(stat => stat.correct_count >= 1).length
+      
+      // 计算总提交次数
+      const totalSubmissionCount = problemStats_filtered.reduce((sum, stat) => sum + stat.submit_count, 0)
+      
+      analysisData.push({
+        problem_id: problem.problem_id,
+        completed_student_count: completedStudentCount,
+        total_submission_count: totalSubmissionCount
+      })
+    }
+    
+    if (analysisData.length === 0) {
+      ElMessage.warning('暂无有效的题目统计数据')
+      return
+    }
+    
+    // 调用AI分析接口
+    const response = await axios.post('/teacher/problem/ai-analyze', analysisData)
+    
+    if (response.data && response.data.code === 200) {
+      aiAnalysisResult.value = response.data.data.ai_result || '分析完成，但未返回结果'
+      ElMessage.success('AI分析完成')
+    } else {
+      throw new Error(response.data?.msg || 'AI分析失败')
+    }
+  } catch (error) {
+    console.error('AI分析失败:', error)
+    ElMessage.error('AI分析失败，请稍后重试')
+    aiAnalysisResult.value = '分析失败，请稍后重试'
+  } finally {
+    aiAnalysisLoading.value = false
+    stopCountdown()
+  }
+}
+
 // 生命周期
 onMounted(() => {
   fetchStudents()
   fetchTeacherInfo()
+})
+
+// 组件销毁时清理定时器
+onBeforeUnmount(() => {
+  stopCountdown()
 })
 </script>
 
@@ -1084,6 +1224,134 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+/* AI分析对话框样式 */
+.ai-analysis-content {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: #606266;
+}
+
+.loading-container .el-icon {
+  font-size: 32px;
+  margin-bottom: 16px;
+  color: #409eff;
+}
+
+.loading-container p {
+  margin: 0 0 20px 0;
+  font-size: 14px;
+}
+
+.countdown-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.countdown-text {
+  font-size: 14px;
+  color: #909399;
+}
+
+.countdown-number {
+  font-size: 18px;
+  font-weight: bold;
+  color: #409eff;
+  min-width: 30px;
+  text-align: center;
+}
+
+.countdown-unit {
+  font-size: 14px;
+  color: #909399;
+}
+
+.analysis-result {
+  flex: 1;
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.result-header .el-icon {
+  color: #409eff;
+  font-size: 18px;
+}
+
+.result-header span {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.result-content {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.result-content pre {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #495057;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.no-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: #909399;
+}
+
+.no-result .el-icon {
+  font-size: 32px;
+  margin-bottom: 16px;
+  color: #e6a23c;
+}
+
+.no-result p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.filter-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.data-info {
+  color: #606266;
+  font-size: 14px;
+  white-space: nowrap;
 }
 
 /* 响应式设计 */

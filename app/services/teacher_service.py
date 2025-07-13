@@ -1,6 +1,10 @@
 from typing import Optional, List, Dict, Tuple, Any
+
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, distinct, and_
+from starlette import status
+
 from models import (
     Teacher, Course, Semester, Student, CourseSelection, AnswerRecord, Problem,
     DatabaseSchema
@@ -13,8 +17,10 @@ from schemas.teacher import (
     StudentInfoResponse, StudentProfileNewResponse, StudentProfileDocResponse,
     StudentCourseAddRequest, StudentCourseAddResponse, StudentCourseItem,
     SchemaCreateRequest, SchemaCreateResponse, SchemaUpdateRequest, SchemaUpdateResponse,
+    SchemaStatusUpdateRequest, SchemaStatusUpdateResponse,
     SQLQueryRequest, SQLQueryResponse,
-    ProblemCreateRequest, ProblemCreateResponse
+    ProblemCreateRequest, ProblemCreateResponse,
+    DatabaseLinkInfo, DatabaseLinkInfoResponse
 )
 # 已删除无用导入: CourseInfo, TeacherCourseListResponse, StudentGradeInfo, CourseGradeResponse, ProblemStatisticsResponse, DashboardMatrixResponse
 from datetime import datetime
@@ -760,7 +766,8 @@ class TeacherService:
                     is_required=problem.is_required or 0,
                     is_ordered=problem.is_ordered or 0,
                     problem_content=problem.problem_content or "",
-                    example_sql=problem.example_sql or ""
+                    example_sql=problem.example_sql or "",
+                    knowledge=problem.knowledge or None
                 ))
 
             return TeacherProblemListDocResponse(
@@ -817,7 +824,8 @@ class TeacherService:
                 problem_content=problem_data.problem_content.strip(),
                 is_required=problem_data.is_required,
                 is_ordered=problem_data.is_ordered,
-                example_sql=problem_data.example_sql.strip()
+                example_sql=problem_data.example_sql.strip(),
+                knowledge=problem_data.knowledge.strip() if problem_data.knowledge else None
             )
 
             db.add(new_problem)
@@ -1143,6 +1151,154 @@ class TeacherService:
         except Exception as e:
             print(f"获取学生答题记录失败: {e}")
             return []
+
+    def update_schema_status(self, teacher_id: str, request_data: SchemaStatusUpdateRequest, 
+                           db: Session) -> Tuple[bool, str, Optional[SchemaStatusUpdateResponse]]:
+        """设置数据库模式的权限"""
+        try:
+            # 验证教师是否存在
+            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
+            if not teacher:
+                return False, "教师不存在", None
+
+            # 验证数据库模式是否存在
+            schema = db.query(DatabaseSchema).filter(
+                DatabaseSchema.schema_id == request_data.schema_id
+            ).first()
+            if not schema:
+                return False, "数据库模式不存在", None
+
+            # 验证status参数的有效性
+            if request_data.status not in [0, 1]:
+                return False, "状态参数无效，只能为0（禁用）或1（启用）", None
+
+            # 更新数据库模式的状态
+            schema.schema_status = request_data.status
+            db.commit()
+
+            response = SchemaStatusUpdateResponse(
+                code=200,
+                message="权限设置成功"
+            )
+
+            return True, "权限设置成功", response
+
+        except Exception as e:
+            db.rollback()
+            print(f"设置数据库模式权限失败: {e}")
+            return False, f"设置失败: {str(e)}", None
+
+    async def analyze_problem_knowledge_mastery(self, teacher_id: str, problem_data: List[Dict], db: Session) -> Tuple[bool, str, Optional['ProblemKnowledgeAnalysisResponse']]:
+        """AI分析题目知识点掌握度"""
+        try:
+            from schemas.teacher import ProblemKnowledgeAnalysisResponse
+            from services.ai_service import ai_service
+            
+            # 验证教师是否存在
+            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
+            if not teacher:
+                return False, "教师不存在", None
+
+            # 构建AI分析的数据
+            analysis_data = []
+            for item in problem_data:
+                problem_id = item.get('problem_id')
+                completed_student_count = item.get('completed_student_count')
+                total_submission_count = item.get('total_submission_count')
+                
+                # 根据problem_id获取题目的knowledge字段
+                problem = db.query(Problem).filter(Problem.problem_id == problem_id).first()
+                if problem:
+                    analysis_data.append({
+                        "problem_knowledge": problem.knowledge or "未指定知识点",
+                        "completed_student_count": completed_student_count,
+                        "total_submission_count": total_submission_count
+                    })
+
+            # 构建AI分析的prompt
+            prompt = self._build_knowledge_analysis_prompt(analysis_data)
+            
+            # 调用AI服务进行分析
+            ai_result = ai_service._call_ai_api(prompt)
+            
+            response = ProblemKnowledgeAnalysisResponse(
+                code=200,
+                msg="分析成功",
+                data={"ai_result": ai_result}
+            )
+            
+            return True, "分析成功", response
+            
+        except Exception as e:
+            print(f"AI分析知识点掌握度失败: {e}")
+            return False, f"分析失败: {str(e)}", None
+    
+    def _build_knowledge_analysis_prompt(self, analysis_data: List[Dict]) -> str:
+        """构建知识点分析的AI prompt"""
+        prompt = "你是一个数据分析师和大学数据库课程的助教，根据每道题目知识点和学生完成情况分析学生的作答情况以及后续的教学建议。\n\n"
+        
+        for i, data in enumerate(analysis_data, 1):
+            prompt += f"题目{i}:\n"
+            prompt += f"知识点: {data['problem_knowledge']}\n"
+            prompt += f"完成学生人数: {data['completed_student_count']}\n"
+            prompt += f"总提交次数: {data['total_submission_count']}\n\n"
+        
+        prompt += "请根据以上数据分析：\n"
+        prompt += "1. 学生对各个知识点的掌握情况\n"
+        prompt += "2. 哪些知识点学生掌握较好，哪些需要加强\n"
+        prompt += "3. 根据提交次数和完成率，分析学生的学习难点\n"
+        prompt += "4. 提供针对性的教学建议和改进措施\n\n"
+        prompt += "请用专业、客观的语调分析，控制在400字以内。"
+        
+        return prompt
+
+    def get_database_link_info(self, teacher_id: str, db: Session) -> DatabaseLinkInfoResponse:
+        """获取数据库连接信息"""
+        try:
+            # 验证教师是否存在
+            teacher = db.query(Teacher).filter(Teacher.teacher_id == teacher_id).first()
+            if not teacher:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="教师不存在"
+                )
+
+            # 获取数据库连接信息
+            database_links = [
+                DatabaseLinkInfo(
+                    name="MySQL",
+                    type="mysql",
+                    host=os.getenv("MYSQL_HOST", "localhost"),
+                    port=int(os.getenv("MYSQL_PORT", "3306")),
+                    database=os.getenv("MYSQL_DATABASE", "sqlsys"),
+                    username=os.getenv("MYSQL_USER", "root")
+                ),
+                DatabaseLinkInfo(
+                    name="PostgreSQL",
+                    type="postgresql",
+                    host=os.getenv("POSTGRESQL_HOST", "localhost"),
+                    port=int(os.getenv("POSTGRESQL_PORT", "55433")),
+                    database=os.getenv("POSTGRESQL_DATABASE", "postgres"),
+                    username=os.getenv("POSTGRESQL_USER", "postgres")
+                ),
+                DatabaseLinkInfo(
+                    name="openGauss",
+                    type="opengauss",
+                    host=os.getenv("OPENGAUSS_HOST", "localhost"),
+                    port=int(os.getenv("OPENGAUSS_PORT", "15432")),
+                    database=os.getenv("OPENGAUSS_DATABASE", "postgres"),
+                    username=os.getenv("OPENGAUSS_USER", "gaussdb")
+                )
+            ]
+
+            return DatabaseLinkInfoResponse(**{"link-infos": database_links})
+
+        except Exception as e:
+            print(f"获取数据库连接信息失败: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"获取数据库连接信息失败: {str(e)}"
+            )
 
 # 全局教师服务实例
 teacher_service = TeacherService()
